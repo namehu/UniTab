@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tab Sorter Pro - 设置</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body class="bg-gray-50 min-h-screen">
+  <!-- 顶部导航栏 -->
+  <header class="bg-white shadow-sm border-b border-gray-200">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-16">
+        <div class="flex items-center space-x-4">
+          <img src="../icons/icon48.png" alt="Tab Sorter Pro" class="w-8 h-8">
+          <h1 class="text-xl font-semibold text-gray-900">Tab Sorter Pro 设置</h1>
+        </div>
+        
+        <div class="flex items-center space-x-4">
+          <button id="backToList" class="text-gray-500 hover:text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-100">
+            ← 返回列表
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- 主要内容区域 -->
+  <main class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <!-- 设置导航 -->
+    <div class="flex space-x-1 mb-8">
+      <button class="tab-btn active" data-tab="general">
+        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+        </svg>
+        常规设置
+      </button>
+      
+      <button class="tab-btn" data-tab="behavior">
+        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+        </svg>
+        行为设置
+      </button>
+      
+      <button class="tab-btn" data-tab="data">
+        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"></path>
+        </svg>
+        数据管理
+      </button>
+      
+      <button class="tab-btn" data-tab="about">
+        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        </svg>
+        关于
+      </button>
+    </div>
+
+    <!-- 常规设置 -->
+    <div id="generalTab" class="tab-content">
+      <div class="bg-white rounded-lg shadow p-6">
+        <h2 class="text-lg font-semibold text-gray-900 mb-6">常规设置</h2>
+        
+        <div class="space-y-6">
+          <!-- 默认分组名称 -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">默认分组名称模板</label>
+            <input
+              type="text"
+              id="defaultGroupName"
+              placeholder="分组 {date} {time}"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+            <p class="text-xs text-gray-500 mt-1">
+              可用变量：{date} - 日期，{time} - 时间，{count} - 标签页数量
+            </p>
+          </div>
+          
+          <!-- 主题设置 -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">主题</label>
+            <select id="theme" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+              <option value="auto">跟随系统</option>
+              <option value="light">浅色</option>
+              <option value="dark">深色</option>
+            </select>
+          </div>
+          
+          <!-- 语言设置 -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">语言</label>
+            <select id="language" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+              <option value="zh-CN">简体中文</option>
+              <option value="en-US">English</option>
+            </select>
+          </div>
+          
+          <!-- 快捷键设置 -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">快捷键</label>
+            <div class="space-y-3">
+              <div class="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
+                <span class="text-sm text-gray-700">聚合当前窗口标签页</span>
+                <kbd class="px-2 py-1 text-xs font-semibold text-gray-800 bg-gray-100 border border-gray-200 rounded">点击扩展图标</kbd>
+              </div>
+              <div class="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
+                <span class="text-sm text-gray-700">打开标签页列表</span>
+                <kbd class="px-2 py-1 text-xs font-semibold text-gray-800 bg-gray-100 border border-gray-200 rounded">Ctrl+Shift+T</kbd>
+              </div>
+              <div class="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
+                <span class="text-sm text-gray-700">新建分组</span>
+                <kbd class="px-2 py-1 text-xs font-semibold text-gray-800 bg-gray-100 border border-gray-200 rounded">Ctrl+N</kbd>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 行为设置 -->
+    <div id="behaviorTab" class="tab-content hidden">
+      <div class="bg-white rounded-lg shadow p-6">
+        <h2 class="text-lg font-semibold text-gray-900 mb-6">行为设置</h2>
+        
+        <div class="space-y-6">
+          <!-- 聚合行为 -->
+          <div>
+            <h3 class="text-md font-medium text-gray-900 mb-4">标签页聚合</h3>
+            
+            <div class="space-y-4">
+              <div class="flex items-center justify-between">
+                <div>
+                  <label class="text-sm font-medium text-gray-700">自动排除固定标签页</label>
+                  <p class="text-xs text-gray-500">聚合时不包含已固定的标签页</p>
+                </div>
+                <input type="checkbox" id="excludePinnedTabs" class="toggle-switch" checked>
+              </div>
+              
+              <div class="flex items-center justify-between">
+                <div>
+                  <label class="text-sm font-medium text-gray-700">排除系统页面</label>
+                  <p class="text-xs text-gray-500">不聚合 chrome:// 等系统页面</p>
+                </div>
+                <input type="checkbox" id="excludeSystemPages" class="toggle-switch" checked>
+              </div>
+              
+              <div class="flex items-center justify-between">
+                <div>
+                  <label class="text-sm font-medium text-gray-700">聚合后自动打开列表页</label>
+                  <p class="text-xs text-gray-500">完成聚合后自动跳转到标签页列表</p>
+                </div>
+                <input type="checkbox" id="autoOpenList" class="toggle-switch" checked>
+              </div>
+            </div>
+          </div>
+          
+          <!-- 恢复行为 -->
+          <div>
+            <h3 class="text-md font-medium text-gray-900 mb-4">标签页恢复</h3>
+            
+            <div class="space-y-4">
+              <div class="flex items-center justify-between">
+                <div>
+                  <label class="text-sm font-medium text-gray-700">在新窗口中恢复</label>
+                  <p class="text-xs text-gray-500">恢复标签页时创建新窗口</p>
+                </div>
+                <input type="checkbox" id="restoreInNewWindow" class="toggle-switch">
+              </div>
+              
+              <div class="flex items-center justify-between">
+                <div>
+                  <label class="text-sm font-medium text-gray-700">恢复后激活第一个标签页</label>
+                  <p class="text-xs text-gray-500">自动切换到恢复的第一个标签页</p>
+                </div>
+                <input type="checkbox" id="activateFirstTab" class="toggle-switch" checked>
+              </div>
+            </div>
+          </div>
+          
+          <!-- 通知设置 -->
+          <div>
+            <h3 class="text-md font-medium text-gray-900 mb-4">通知</h3>
+            
+            <div class="space-y-4">
+              <div class="flex items-center justify-between">
+                <div>
+                  <label class="text-sm font-medium text-gray-700">显示操作通知</label>
+                  <p class="text-xs text-gray-500">聚合、恢复等操作的成功提示</p>
+                </div>
+                <input type="checkbox" id="showNotifications" class="toggle-switch" checked>
+              </div>
+              
+              <div class="flex items-center justify-between">
+                <div>
+                  <label class="text-sm font-medium text-gray-700">通知自动消失时间</label>
+                  <p class="text-xs text-gray-500">通知显示的持续时间（秒）</p>
+                </div>
+                <select id="notificationDuration" class="px-3 py-1 border border-gray-300 rounded">
+                  <option value="3">3秒</option>
+                  <option value="5" selected>5秒</option>
+                  <option value="10">10秒</option>
+                  <option value="0">手动关闭</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 数据管理 -->
+    <div id="dataTab" class="tab-content hidden">
+      <div class="space-y-6">
+        <!-- 存储统计 -->
+        <div class="bg-white rounded-lg shadow p-6">
+          <h2 class="text-lg font-semibold text-gray-900 mb-6">存储统计</h2>
+          
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="text-center p-4 bg-blue-50 rounded-lg">
+              <div class="text-2xl font-bold text-blue-600" id="totalGroupsCount">0</div>
+              <div class="text-sm text-gray-600">总分组数</div>
+            </div>
+            
+            <div class="text-center p-4 bg-green-50 rounded-lg">
+              <div class="text-2xl font-bold text-green-600" id="totalTabsCount">0</div>
+              <div class="text-sm text-gray-600">总标签页数</div>
+            </div>
+            
+            <div class="text-center p-4 bg-purple-50 rounded-lg">
+              <div class="text-2xl font-bold text-purple-600" id="storageUsed">0 KB</div>
+              <div class="text-sm text-gray-600">存储空间使用</div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 数据导入导出 -->
+        <div class="bg-white rounded-lg shadow p-6">
+          <h2 class="text-lg font-semibold text-gray-900 mb-6">数据备份与恢复</h2>
+          
+          <div class="space-y-4">
+            <div class="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+              <div>
+                <h3 class="text-sm font-medium text-gray-900">导出数据</h3>
+                <p class="text-xs text-gray-500">将所有分组数据导出为 JSON 文件</p>
+              </div>
+              <button id="exportData" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
+                导出
+              </button>
+            </div>
+            
+            <div class="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+              <div>
+                <h3 class="text-sm font-medium text-gray-900">导入数据</h3>
+                <p class="text-xs text-gray-500">从 JSON 文件恢复分组数据</p>
+              </div>
+              <div class="flex space-x-2">
+                <input type="file" id="importFile" accept=".json" class="hidden">
+                <button id="importData" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
+                  导入
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 数据清理 -->
+        <div class="bg-white rounded-lg shadow p-6">
+          <h2 class="text-lg font-semibold text-gray-900 mb-6">数据清理</h2>
+          
+          <div class="space-y-4">
+            <div class="flex items-center justify-between p-4 border border-yellow-200 bg-yellow-50 rounded-lg">
+              <div>
+                <h3 class="text-sm font-medium text-gray-900">清理空分组</h3>
+                <p class="text-xs text-gray-500">删除没有标签页的空分组</p>
+              </div>
+              <button id="cleanEmptyGroups" class="bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700">
+                清理
+              </button>
+            </div>
+            
+            <div class="flex items-center justify-between p-4 border border-red-200 bg-red-50 rounded-lg">
+              <div>
+                <h3 class="text-sm font-medium text-gray-900">清除所有数据</h3>
+                <p class="text-xs text-gray-500">删除所有分组和设置数据（不可恢复）</p>
+              </div>
+              <button id="clearAllData" class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700">
+                清除
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 关于 -->
+    <div id="aboutTab" class="tab-content hidden">
+      <div class="bg-white rounded-lg shadow p-6">
+        <div class="text-center mb-8">
+          <img src="../icons/icon128.png" alt="Tab Sorter Pro" class="w-16 h-16 mx-auto mb-4">
+          <h2 class="text-2xl font-bold text-gray-900 mb-2">Tab Sorter Pro</h2>
+          <p class="text-gray-600 mb-4">流畅工作流，从标签页整理开始</p>
+          <div class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+            版本 1.0.0
+          </div>
+        </div>
+        
+        <div class="space-y-6">
+          <!-- 功能特性 -->
+          <div>
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">主要功能</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div class="flex items-start space-x-3">
+                <div class="flex-shrink-0 w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center">
+                  <svg class="w-3 h-3 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                  </svg>
+                </div>
+                <div>
+                  <h4 class="text-sm font-medium text-gray-900">智能标签页聚合</h4>
+                  <p class="text-xs text-gray-500">一键整理当前窗口的所有标签页</p>
+                </div>
+              </div>
+              
+              <div class="flex items-start space-x-3">
+                <div class="flex-shrink-0 w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center">
+                  <svg class="w-3 h-3 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                  </svg>
+                </div>
+                <div>
+                  <h4 class="text-sm font-medium text-gray-900">分组管理</h4>
+                  <p class="text-xs text-gray-500">创建、编辑、删除标签页分组</p>
+                </div>
+              </div>
+              
+              <div class="flex items-start space-x-3">
+                <div class="flex-shrink-0 w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center">
+                  <svg class="w-3 h-3 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                  </svg>
+                </div>
+                <div>
+                  <h4 class="text-sm font-medium text-gray-900">快速恢复</h4>
+                  <p class="text-xs text-gray-500">一键恢复保存的标签页</p>
+                </div>
+              </div>
+              
+              <div class="flex items-start space-x-3">
+                <div class="flex-shrink-0 w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center">
+                  <svg class="w-3 h-3 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                  </svg>
+                </div>
+                <div>
+                  <h4 class="text-sm font-medium text-gray-900">搜索过滤</h4>
+                  <p class="text-xs text-gray-500">快速查找特定的标签页或分组</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- 技术信息 -->
+          <div>
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">技术信息</h3>
+            <div class="bg-gray-50 rounded-lg p-4">
+              <dl class="grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-2">
+                <div>
+                  <dt class="text-sm font-medium text-gray-500">版本</dt>
+                  <dd class="text-sm text-gray-900">1.0.0</dd>
+                </div>
+                <div>
+                  <dt class="text-sm font-medium text-gray-500">Manifest</dt>
+                  <dd class="text-sm text-gray-900">V3</dd>
+                </div>
+                <div>
+                  <dt class="text-sm font-medium text-gray-500">权限</dt>
+                  <dd class="text-sm text-gray-900">tabs, storage</dd>
+                </div>
+                <div>
+                  <dt class="text-sm font-medium text-gray-500">存储</dt>
+                  <dd class="text-sm text-gray-900">chrome.storage.local</dd>
+                </div>
+              </dl>
+            </div>
+          </div>
+          
+          <!-- 联系信息 -->
+          <div>
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">支持与反馈</h3>
+            <div class="flex flex-wrap gap-4">
+              <a href="#" class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
+                </svg>
+                使用帮助
+              </a>
+              
+              <a href="#" class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M18 5v8a2 2 0 01-2 2h-5l-5 4v-4H4a2 2 0 01-2-2V5a2 2 0 012-2h12a2 2 0 012 2zM7 8H5v2h2V8zm2 0h2v2H9V8zm6 0h-2v2h2V8z" clip-rule="evenodd"></path>
+                </svg>
+                问题反馈
+              </a>
+              
+              <a href="#" class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M12.395 2.553a1 1 0 00-1.45-.385c-.345.23-.614.558-.822.88-.214.33-.403.713-.57 1.116-.334.804-.614 1.768-.84 2.734a31.365 31.365 0 00-.613 3.58 2.64 2.64 0 01-.945-1.067c-.328-.68-.398-1.534-.398-2.654A1 1 0 005.05 6.05 6.981 6.981 0 003 11a7 7 0 1011.95-4.95c-.592-.591-.98-.985-1.348-1.467-.363-.476-.724-1.063-1.207-2.03zM12.12 15.12A3 3 0 017 13s.879.5 2.5.5c0-1 .5-4 1.25-4.5.5 1 .786 1.293 1.371 1.879A2.99 2.99 0 0113 13a2.99 2.99 0 01-.879 2.121z" clip-rule="evenodd"></path>
+                </svg>
+                功能建议
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- 通知消息 -->
+  <div id="notification" class="fixed top-4 right-4 hidden z-50">
+    <div class="bg-white border border-gray-200 rounded-lg shadow-lg p-4 max-w-sm">
+      <div class="flex items-start">
+        <div id="notificationIcon" class="flex-shrink-0 mr-3 mt-0.5">
+          <!-- 图标将根据消息类型动态设置 -->
+        </div>
+        <div class="flex-1">
+          <p id="notificationMessage" class="text-sm text-gray-900"></p>
+        </div>
+        <button id="closeNotification" class="flex-shrink-0 ml-3 text-gray-400 hover:text-gray-600">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 确认对话框 -->
+  <div id="confirmDialog" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden z-50">
+    <div class="flex items-center justify-center min-h-screen p-4">
+      <div class="bg-white rounded-lg shadow-xl max-w-md w-full">
+        <div class="px-6 py-4">
+          <h3 id="confirmTitle" class="text-lg font-medium text-gray-900 mb-2">确认操作</h3>
+          <p id="confirmMessage" class="text-sm text-gray-500">确定要执行此操作吗？</p>
+        </div>
+        
+        <div class="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
+          <button id="confirmCancel" class="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50">
+            取消
+          </button>
+          <button id="confirmOk" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
+            确定
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="options.js"></script>
+</body>
+</html>
