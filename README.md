@@ -106,4 +106,4 @@ MIT License
 
 ---
 
-**Tab Sorter Pro** - 让标签页管理变得简单高效！
+**Uni Tab** - 让标签页管理变得简单高效！

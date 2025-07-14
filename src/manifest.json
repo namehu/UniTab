@@ -6,7 +6,8 @@
   "permissions": [
     "tabs",
     "storage",
-    "identity"
+    "identity",
+    "downloads"
   ],
   "host_permissions": [
     "https://api.github.com/*"

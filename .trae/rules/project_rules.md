@@ -103,15 +103,7 @@ CSS 方案: Tailwind CSS。利用其原子化的 class 来快速构建美观、�
 开发 tab_list.html 页面，实现标签分组的渲染、恢复和删除功能。
 开发 popup.html，实现一键聚合功能。
 
-第二阶段 (远程同步):
-
-在 options.html 中集成 GitHub OAuth 流程，使用 chrome.identity API 获取 token。
-
-在 background.js 中实现与 GitHub Gist API 的交互逻辑（拉取、推送数据）。
-
-添加手动和定时自动同步功能。
-
-第三阶段 (功能完善):
+第二阶段 (功能完善):
 
 在 tab_list.html 中加入搜索功能。
 
@@ -119,10 +111,18 @@ CSS 方案: Tailwind CSS。利用其原子化的 class 来快速构建美观、�
 
 实现分组命名、锁定等高级管理功能。
 
-第四阶段 (测试与发布):
+第三阶段 (测试与发布):
 
 进行全面的功能测试和兼容性测试。
 
 修复 Bug，优化性能和用户体验。
 
 准备相关素材，上架到 Chrome 应用商店。
+
+第四阶段 (远程同步):
+
+在 options.html 中集成 GitHub OAuth 流程，使用 chrome.identity API 获取 token。
+
+在 background.js 中实现与 GitHub Gist API 的交互逻辑（拉取、推送数据）。
+
+添加手动和定时自动同步功能。
