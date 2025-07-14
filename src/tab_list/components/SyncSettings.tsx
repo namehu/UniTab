@@ -53,9 +53,11 @@ export const SyncSettings: React.FC<SyncSettingsProps> = ({ isOpen, onClose }) =
   const checkAuthStatus = async () => {
     try {
       const provider = SyncProviderFactory.createProvider(config.provider)
-      await provider.initialize(config.providerConfig)
+      // 重新初始化provider以加载最新配置
+      await provider.initialize({})
       const authenticated = await provider.isAuthenticated()
       setIsAuthenticated(authenticated)
+      console.log('Auth status checked:', authenticated)
     } catch (error) {
       console.error('Check auth status failed:', error)
       setIsAuthenticated(false)
@@ -94,6 +96,19 @@ export const SyncSettings: React.FC<SyncSettingsProps> = ({ isOpen, onClose }) =
     if (showTokenInput && githubToken) {
       // 使用手动输入的Token
       try {
+        // 首先验证token是否有效
+        const testResponse = await fetch('https://api.github.com/user', {
+          headers: {
+            'Authorization': `Bearer ${githubToken}`,
+            'Accept': 'application/vnd.github.v3+json'
+          }
+        });
+
+        if (!testResponse.ok) {
+          throw new Error('Token验证失败，请检查Token是否正确且具有gist权限');
+        }
+
+        // Token验证成功，保存配置
         const newConfig = {
           ...config,
           providerConfig: {
@@ -107,13 +122,23 @@ export const SyncSettings: React.FC<SyncSettingsProps> = ({ isOpen, onClose }) =
         setConfig(newConfig)
         await syncManager.setConfig(newConfig)
 
+        // 直接保存到GitHubSyncProvider的配置中
+        await chrome.storage.local.set({
+          'sync_github_config': {
+            token: githubToken,
+            filename: 'unitab-data.json',
+            description: 'UniTab Browser Extension Data'
+          }
+        });
+
         // 检查认证状态
         await checkAuthStatus()
         setShowTokenInput(false)
         setGithubToken('')
+        alert('Token保存成功！')
       } catch (error) {
         console.error('GitHub auth with token failed:', error)
-        alert('认证失败，请检查Token是否有效')
+        alert(error instanceof Error ? error.message : '认证失败，请检查Token是否有效')
       }
     } else {
       // 打开GitHub Token创建页面

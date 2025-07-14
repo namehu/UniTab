@@ -30,6 +30,11 @@ export class GitHubSyncProvider implements ISyncProvider {
         ...config
       };
       
+      // 如果传入的配置中没有token，但本地存储中有，则使用本地存储的
+      if (!this.config.token) {
+        await this.loadConfig();
+      }
+      
       // 如果没有 gistId，尝试从 SyncManager 的配置中获取
       if (!this.config.gistId && config.gistId) {
         this.config.gistId = config.gistId;
