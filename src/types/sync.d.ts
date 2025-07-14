@@ -50,10 +50,16 @@ export interface SyncResult {
   success: boolean;
   /** 错误信息 */
   error?: string;
+  /** 成功消息 */
+  message?: string;
   /** 同步时间 */
   timestamp: string;
   /** 同步的数据版本 */
   version?: string;
+  /** 是否进行了自动合并 */
+  merged?: boolean;
+  /** 冲突信息（当需要手动解决时） */
+  conflict?: SyncConflict;
 }
 
 /**
@@ -162,4 +168,7 @@ export interface ISyncManager {
   
   /** 监听同步状态变化 */
   onStatusChange(callback: (status: SyncStatus) => void): void;
+  
+  /** 移除同步状态变化监听器 */
+  offStatusChange(callback: (status: SyncStatus) => void): void;
 }

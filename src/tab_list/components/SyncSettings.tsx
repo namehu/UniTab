@@ -165,13 +165,45 @@ export const SyncSettings: React.FC<SyncSettingsProps> = ({ isOpen, onClose }) =
       const result = await syncManager.sync()
       if (result.success) {
         setLastSyncTime(new Date().toLocaleString())
-        alert('同步成功')
+        if (result.merged) {
+          alert('✅ ' + (result.message || '同步成功，已自动合并多设备数据'))
+        } else {
+          alert('✅ 同步成功')
+        }
       } else {
-        alert(`同步失败: ${result.error}`)
+        if (result.conflict) {
+          // 显示冲突解决选项
+          const choice = confirm(
+            `检测到同步冲突：\n\n` +
+            `本地数据：${new Date(result.conflict.local.timestamp).toLocaleString()} (${result.conflict.local.device.name})\n` +
+            `远程数据：${new Date(result.conflict.remote.timestamp).toLocaleString()} (${result.conflict.remote.device.name})\n\n` +
+            `点击"确定"使用本地数据覆盖远程，点击"取消"使用远程数据覆盖本地。`
+          )
+          
+          try {
+            const resolution = choice ? 'local' : 'remote'
+            const resolveResult = await syncManager.resolveConflict(result.conflict, resolution)
+            
+            if (resolveResult.success) {
+              alert(`✅ 冲突已解决，使用了${choice ? '本地' : '远程'}数据`)
+              if (!choice) {
+                // 如果选择了远程数据，刷新页面
+                window.location.reload()
+              }
+            } else {
+              alert(`❌ 冲突解决失败: ${resolveResult.error}`)
+            }
+          } catch (error) {
+            console.error('Resolve conflict failed:', error)
+            alert('❌ 冲突解决失败，请重试')
+          }
+        } else {
+          alert(`❌ 同步失败: ${result.error}`)
+        }
       }
     } catch (error) {
       console.error('Manual sync failed:', error)
-      alert('同步失败，请重试')
+      alert('❌ 同步失败，请重试')
     }
   }
 

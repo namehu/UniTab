@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { Header, Toolbar, GroupList, GroupDetailModal, NewGroupModal, SyncSettings } from './components'
 import type { Tab, Group, Stats, SortType, ViewType } from './types'
+import { syncManager } from '../utils/sync/SyncManager'
 
 const App: React.FC = () => {
   const [groups, setGroups] = useState<Group[]>([])
@@ -34,6 +35,21 @@ const App: React.FC = () => {
 
   useEffect(() => {
     loadData()
+    
+    // 监听同步状态变化，同步成功后刷新数据
+    const handleSyncStatusChange = (status: string) => {
+      if (status === 'success') {
+        console.log('Sync completed, refreshing data...')
+        loadData()
+      }
+    }
+    
+    syncManager.onStatusChange(handleSyncStatusChange)
+    
+    // 清理监听器
+    return () => {
+      syncManager.offStatusChange(handleSyncStatusChange)
+    }
   }, [loadData])
 
   const filteredAndSortedGroups = useMemo(() => {

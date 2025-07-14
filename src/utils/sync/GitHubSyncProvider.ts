@@ -40,6 +40,11 @@ export class GitHubSyncProvider implements ISyncProvider {
         this.config.gistId = config.gistId;
       }
       
+      // 如果仍然没有 gistId 但有 token，尝试查找现有的 UniTab Gist
+      if (!this.config.gistId && this.config.token) {
+        await this.findExistingGist();
+      }
+      
       console.log('GitHub sync provider initialized with config:', {
         hasToken: !!this.config.token,
         hasGistId: !!this.config.gistId,
@@ -246,9 +251,12 @@ export class GitHubSyncProvider implements ISyncProvider {
   async hasRemoteUpdates(localTimestamp: string): Promise<boolean> {
     try {
       if (!this.config.token || !this.config.gistId) {
+        console.log('hasRemoteUpdates: No token or gistId');
         return false;
       }
 
+      console.log('Checking remote updates for gistId:', this.config.gistId);
+      
       const response = await fetch(`${this.baseUrl}/gists/${this.config.gistId}`, {
         headers: {
           'Authorization': `Bearer ${this.config.token}`,
@@ -257,12 +265,17 @@ export class GitHubSyncProvider implements ISyncProvider {
       });
 
       if (!response.ok) {
+        console.log('hasRemoteUpdates: API request failed:', response.status, response.statusText);
         return false;
       }
 
       const gist = await response.json();
       const remoteUpdatedAt = new Date(gist.updated_at).getTime();
       const localUpdatedAt = new Date(localTimestamp).getTime();
+      
+      console.log('Remote updated at:', gist.updated_at, '(', remoteUpdatedAt, ')');
+      console.log('Local timestamp:', localTimestamp, '(', localUpdatedAt, ')');
+      console.log('Has remote updates:', remoteUpdatedAt > localUpdatedAt);
       
       return remoteUpdatedAt > localUpdatedAt;
     } catch (error) {
@@ -307,6 +320,74 @@ export class GitHubSyncProvider implements ISyncProvider {
         error: error instanceof Error ? error.message : 'Delete failed',
         timestamp: new Date().toISOString()
       };
+    }
+  }
+
+  /**
+   * 查找现有的 UniTab Gist
+   */
+  private async findExistingGist(): Promise<void> {
+    try {
+      if (!this.config.token) {
+        return;
+      }
+
+      console.log('Searching for existing UniTab Gist...');
+      
+      // 获取用户的所有 Gist
+      const response = await fetch(`${this.baseUrl}/gists`, {
+        headers: {
+          'Authorization': `Bearer ${this.config.token}`,
+          'Accept': 'application/vnd.github.v3+json'
+        }
+      });
+
+      if (!response.ok) {
+        console.warn('Failed to fetch user gists:', response.statusText);
+        return;
+      }
+
+      const gists = await response.json();
+      
+      // 查找包含 UniTab 数据的 Gist
+      for (const gist of gists) {
+        // 检查 Gist 描述是否包含 UniTab 关键词
+        if (gist.description && gist.description.toLowerCase().includes('unitab')) {
+          // 检查是否包含我们的数据文件
+          if (gist.files && gist.files[this.config.filename]) {
+            console.log('Found existing UniTab Gist:', gist.id);
+            this.config.gistId = gist.id;
+            await this.saveConfig();
+            return;
+          }
+        }
+        
+        // 也检查文件名匹配的情况
+        if (gist.files && gist.files[this.config.filename]) {
+          try {
+            // 尝试解析文件内容，检查是否是 UniTab 数据格式
+            const file = gist.files[this.config.filename];
+            if (file.content) {
+              const data = JSON.parse(file.content);
+              // 检查数据结构是否符合 UniTab 格式
+              if (data.device && data.data && data.data.groups !== undefined) {
+                console.log('Found existing UniTab Gist by content:', gist.id);
+                this.config.gistId = gist.id;
+                await this.saveConfig();
+                return;
+              }
+            }
+          } catch (error) {
+            // 忽略解析错误，继续查找下一个
+            continue;
+          }
+        }
+      }
+      
+      console.log('No existing UniTab Gist found, will create new one when uploading');
+    } catch (error) {
+      console.error('Find existing Gist failed:', error);
+      // 不抛出错误，允许继续初始化
     }
   }
 
