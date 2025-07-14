@@ -26,7 +26,7 @@ const DEFAULT_DATA = {
 // 初始化存储
 chrome.runtime.onInstalled.addListener(async () => {
   console.log('Tab Sorter Pro installed');
-  
+
   // 检查是否已有数据，如果没有则初始化
   const result = await chrome.storage.local.get(STORAGE_KEY);
   if (!result[STORAGE_KEY]) {
@@ -46,27 +46,27 @@ async function aggregateCurrentWindowTabs() {
   try {
     // 获取当前窗口的所有标签页
     const tabs = await chrome.tabs.query({ currentWindow: true });
-    
+
     // 过滤掉固定的标签页和排除列表中的标签页
     const data = await getStorageData();
     const excludeList = data.settings.excludeList || [];
-    
+
     const tabsToSave = tabs.filter(tab => {
       // 排除固定的标签页
       if (tab.pinned) return false;
-      
+
       // 排除当前插件的页面
       if (tab.url.includes('chrome-extension://')) return false;
-      
+
       // 排除设置中的域名
       return !excludeList.some(excludeUrl => tab.url.startsWith(excludeUrl));
     });
-    
+
     if (tabsToSave.length === 0) {
       console.log('No tabs to save');
       return;
     }
-    
+
     // 创建新的标签页分组
     const newGroup = {
       id: Date.now(),
@@ -79,20 +79,20 @@ async function aggregateCurrentWindowTabs() {
         favIconUrl: tab.favIconUrl || `https://www.google.com/s2/favicons?sz=64&domain_url=${new URL(tab.url).hostname}`
       }))
     };
-    
+
     // 保存到存储
     data.groups.unshift(newGroup); // 添加到开头
     await chrome.storage.local.set({ [STORAGE_KEY]: data });
-    
+
     // 关闭已保存的标签页
     const tabIdsToClose = tabsToSave.map(tab => tab.id);
     await chrome.tabs.remove(tabIdsToClose);
-    
+
     // 打开标签页列表页面
-    await chrome.tabs.create({ url: chrome.runtime.getURL('tab_list/tab_list.html') });
-    
+    await chrome.tabs.create({ url: chrome.runtime.getURL('tab_list.html') });
+
     console.log(`Saved ${tabsToSave.length} tabs to group: ${newGroup.name}`);
-    
+
   } catch (error) {
     console.error('Error aggregating tabs:', error);
   }
@@ -114,7 +114,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         sendResponse({ success: false, error: error.message });
       });
       return true; // 保持消息通道开放
-      
+
     case 'getData':
       getStorageData().then(data => {
         sendResponse({ success: true, data });
@@ -122,7 +122,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         sendResponse({ success: false, error: error.message });
       });
       return true;
-      
+
     case 'saveData':
       chrome.storage.local.set({ [STORAGE_KEY]: request.data }).then(() => {
         sendResponse({ success: true });
@@ -130,7 +130,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         sendResponse({ success: false, error: error.message });
       });
       return true;
-      
+
     case 'restoreTabs':
       restoreTabs(request.tabs).then(() => {
         sendResponse({ success: true });
