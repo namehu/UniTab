@@ -1,10 +1,14 @@
-技术设计文档 (TDD) - Uni Tab
+## 系统架构
 
+* 本插件将基于 Chrome Manifest V3 规范进行开发，以确保安全性和未来的兼容性。
+* 使用 pnpm 管理包
+* 核心语言: HTML5, CSS3,  ES6+、 Typescript、React
+* CSS 方案: Tailwind CSS。利用其原子化的 class 来快速构建美观、响应式的界面，无需编写大量自定义 CSS。
+* 图标: Lucide Icons 或 Feather Icons，轻量且风格现代。
+* 打包工具: 引入 Vite 进行模块化管理和打包。
+* UI 组件库(可选/按需使用)： Antd 5.x
 
-1. 系统架构
-本插件将基于 Chrome Manifest V3 规范进行开发，以确保安全性和未来的兼容性。
-
-核心组件:
+## 核心组件:
 
 background.js (Service Worker):
 职责: 作为插件的大脑，它是一个常驻（或事件驱动）的后台脚本。
@@ -43,16 +47,8 @@ options/ (选项页):
 管理用户设置（如排除列表）并将其保存到 chrome.storage。
 实现数据的导入和导出。
 
-2. 技术选型
-核心语言: HTML5, CSS3, JavaScript (ES6+) Typescript。
-UI 框架: 引入 React 来构建动态 UI。
-UI 组件库(可选/按需使用)： Antd 5.x
-CSS 方案: Tailwind CSS。利用其原子化的 class 来快速构建美观、响应式的界面，无需编写大量自定义 CSS。
-图标: Lucide Icons 或 Feather Icons，轻量且风格现代。
-打包工具: 引入 Vite 进行模块化管理和打包。
-使用 pnpm管理包
+## 数据结构
 
-3. 数据结构
 数据将以 JSON 格式存储在 chrome.storage.local 中。远程同步的也是这个 JSON 对象。
 
 主数据结构 (data.json):
@@ -92,37 +88,26 @@ CSS 方案: Tailwind CSS。利用其原子化的 class 来快速构建美观、�
   ]
 }
 
-4. manifest.json 关键权限
 
-5. 开发里程碑
-第一阶段 (MVP 核心功能) 已完成:
+## 开发里程碑
+
+### 第一阶段 (MVP 核心功能) 已完成
 
 搭建项目基本结构，配置 manifest.json。
-
 完成 background.js 的核心逻辑：获取标签页、保存到 storage。
-开发 tab_list.html 页面，实现标签分组的渲染、恢复和删除功能。
+开发 tab_list.html 页面，实现标签分组的渲染、恢复和删除功能。加入搜索功能。
 开发 popup.html，实现一键聚合功能。
-
-第二阶段 (功能完善):
-
-在 tab_list.html 中加入搜索功能。
-
-完善 options.html 的所有配置项。
-
+完善 optionffs.html 的所有配置项。
 实现分组命名、锁定等高级管理功能。
 
-第三阶段 (测试与发布):
-
-进行全面的功能测试和兼容性测试。
-
-修复 Bug，优化性能和用户体验。
-
-准备相关素材，上架到 Chrome 应用商店。
-
-第四阶段 (远程同步):
+### 远程同步 已完成
 
 在 options.html 中集成 GitHub OAuth 流程，使用 chrome.identity API 获取 token。
-
 在 background.js 中实现与 GitHub Gist API 的交互逻辑（拉取、推送数据）。
-
 添加手动和定时自动同步功能。
+
+### 测试与发布
+
+进行全面的功能测试和兼容性测试。
+修复 Bug，优化性能和用户体验。
+准备相关素材，上架到 Chrome 应用商店
