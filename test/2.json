@@ -1,0 +1,47 @@
+{
+  "version": "v1752502883065",
+  "timestamp": "2025-07-14T14:21:23.065Z",
+  "device": {
+    "id": "github_user_26371978",
+    "name": "namehu's Windows Device",
+    "platform": "Windows"
+  },
+  "data": {
+    "groups": [
+      {
+        "createdAt": "2025-07-14T13:42:33.855Z",
+        "id": 1752500553846,
+        "locked": false,
+        "name": "标签页分组 - 2025/07/14 21:42:33",
+        "pinned": false,
+        "tabs": [
+          {
+            "favIconUrl": "https://www.wappalyzer.com/favicon.ico",
+            "id": 724146067,
+            "title": "Upgraded - Wappalyzer",
+            "url": "https://www.wappalyzer.com/upgraded/?utm_source=upgraded&utm_medium=extension&utm_campaign=wappalyzer"
+          },
+          {
+            "favIconUrl": "https://github.githubassets.com/favicons/favicon.svg",
+            "id": 724146070,
+            "title": "Issues · namehu/UniTab",
+            "url": "https://github.com/namehu/UniTab/issues"
+          }
+        ]
+      }
+    ],
+    "settings": {
+      "excludeList": [
+        "chrome://",
+        "chrome-extension://",
+        "edge://",
+        "about:"
+      ],
+      "sync": {
+        "gistId": null,
+        "lastSync": null,
+        "provider": null
+      }
+    }
+  }
+}

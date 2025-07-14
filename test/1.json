@@ -1,0 +1,103 @@
+{
+  "version": "v1752503200000",
+  "timestamp": "2025-07-14T14:26:40.000Z",
+  "device": {
+    "id": "device_26371978",
+    "name": "namehu's MacBook Device",
+    "platform": "macOS",
+    "githubUserId": "26371978"
+  },
+  "data": {
+    "groups": [
+      {
+        "createdAt": "2025-07-14T13:42:33.855Z",
+        "id": 1752500553846,
+        "locked": false,
+        "name": "标签页分组 - 2025/07/14 21:42:33",
+        "pinned": false,
+        "tabs": [
+          {
+            "favIconUrl": "https://www.wappalyzer.com/favicon.ico",
+            "id": 724146067,
+            "title": "Upgraded - Wappalyzer",
+            "url": "https://www.wappalyzer.com/upgraded/?utm_source=upgraded&utm_medium=extension&utm_campaign=wappalyzer"
+          },
+          {
+            "favIconUrl": "https://github.githubassets.com/favicons/favicon.svg",
+            "id": 724146070,
+            "title": "Issues · namehu/UniTab",
+            "url": "https://github.com/namehu/UniTab/issues"
+          },
+          {
+            "favIconUrl": "https://developer.chrome.com/favicon.ico",
+            "id": 724146071,
+            "title": "Chrome Extensions API",
+            "url": "https://developer.chrome.com/docs/extensions/"
+          }
+        ]
+      },
+      {
+        "createdAt": "2025-07-14T14:15:20.123Z",
+        "id": 1752502520123,
+        "locked": true,
+        "name": "开发工具集合",
+        "pinned": true,
+        "tabs": [
+          {
+            "favIconUrl": "https://vitejs.dev/favicon.ico",
+            "id": 724146072,
+            "title": "Vite | Next Generation Frontend Tooling",
+            "url": "https://vitejs.dev/"
+          },
+          {
+            "favIconUrl": "https://tailwindcss.com/favicon.ico",
+            "id": 724146073,
+            "title": "Tailwind CSS - Rapidly build modern websites",
+            "url": "https://tailwindcss.com/"
+          },
+          {
+            "favIconUrl": "https://www.typescriptlang.org/favicon.ico",
+            "id": 724146074,
+            "title": "TypeScript: JavaScript With Syntax For Types",
+            "url": "https://www.typescriptlang.org/"
+          }
+        ]
+      },
+      {
+        "createdAt": "2025-07-14T14:20:45.789Z",
+        "id": 1752502845789,
+        "locked": false,
+        "name": "技术文档",
+        "pinned": false,
+        "tabs": [
+          {
+            "favIconUrl": "https://react.dev/favicon.ico",
+            "id": 724146075,
+            "title": "React – The library for web and native user interfaces",
+            "url": "https://react.dev/"
+          },
+          {
+            "favIconUrl": "https://nodejs.org/favicon.ico",
+            "id": 724146076,
+            "title": "Node.js — Run JavaScript Everywhere",
+            "url": "https://nodejs.org/"
+          }
+        ]
+      }
+    ],
+    "settings": {
+      "excludeList": [
+        "chrome://",
+        "chrome-extension://",
+        "edge://",
+        "about:",
+        "localhost:3000"
+      ],
+      "sync": {
+        "gistId": "a0fc859423ce35f609afbc895621935f",
+        "lastSync": "2025-07-14T14:25:30.000Z",
+        "provider": "github"
+      }
+    }
+  }
+}
