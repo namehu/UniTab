@@ -21,7 +21,7 @@ export class SyncManager implements ISyncManager {
   private _status: SyncStatus = 'idle';
   private _config: SyncConfig;
   private provider: ISyncProvider | null = null;
-  private autoSyncTimer: number | null = null;
+  private autoSyncTimer: ReturnType<typeof setInterval> | null = null;
   private statusCallbacks: ((status: SyncStatus) => void)[] = [];
 
   constructor() {
@@ -80,6 +80,11 @@ export class SyncManager implements ISyncManager {
       // 停止自动同步
       this.disableAutoSync();
       
+      // 禁用实时同步
+      const { RealtimeSyncManager } = await import('./RealtimeSyncManager');
+      const realtimeSyncManager = RealtimeSyncManager.getInstance();
+      realtimeSyncManager.disable();
+      
       // 重置配置为默认值
       this._config = {
         provider: 'github',
@@ -98,7 +103,7 @@ export class SyncManager implements ISyncManager {
       // 重置状态
       this.setStatus('idle');
       
-      console.log('Sync config cleared successfully');
+      console.log('Sync config cleared successfully, realtime sync disabled');
     } catch (error) {
       console.error('Clear sync config failed:', error);
       throw error;
@@ -209,14 +214,28 @@ export class SyncManager implements ISyncManager {
         };
       }
       
-      // 情况3: 本地有，远程也有 - 智能合并
-      console.log('Case 3: Both local and remote data exist - performing intelligent merge');
+      // 情况3: 本地有，远程也有 - 检测冲突并处理
+      console.log('Case 3: Both local and remote data exist - checking for conflicts');
       if (!remoteData) {
         throw new Error('Remote data should exist but is null');
       }
       
-      // 智能合并本地和远程数据（按组ID为唯一标识）
-      console.log('Performing intelligent merge by group ID...');
+      // 检测是否存在冲突
+      const conflict = await this.detectConflict(localData, remoteData);
+      
+      if (conflict) {
+         console.log('Conflict detected between local and remote data');
+         this.setStatus('error');
+         return {
+           success: false,
+           conflict,
+           message: '检测到同步冲突，需要用户选择解决方案',
+           timestamp: new Date().toISOString()
+         };
+       }
+      
+      // 没有冲突，进行智能合并
+      console.log('No conflict detected, performing intelligent merge');
       const mergedData = this.mergeData(localData, remoteData);
       console.log('Merged data groups count:', mergedData.data.groups?.length || 0);
       
@@ -396,7 +415,7 @@ export class SyncManager implements ISyncManager {
     this.disableAutoSync(); // 先清除现有的定时器
     
     if (this._config.syncInterval > 0) {
-      this.autoSyncTimer = window.setInterval(() => {
+      this.autoSyncTimer = setInterval(() => {
         this.sync().catch(error => {
           console.error('Auto sync failed:', error);
         });
@@ -490,7 +509,8 @@ export class SyncManager implements ISyncManager {
         device: {
           id: await this.getDeviceId(),
           name: await this.getDeviceName(),
-          platform: this.getPlatform()
+          platform: this.getPlatform(),
+          githubUserId: await this.getGitHubUserId() || undefined
         },
         data: {
           groups: storageData.groups || [],
@@ -534,17 +554,36 @@ export class SyncManager implements ISyncManager {
   /**
    * 检测同步冲突
    */
-  private detectConflict(local: SyncData, remote: SyncData): SyncConflict | null {
+  private async detectConflict(local: SyncData, remote: SyncData): Promise<SyncConflict | null> {
     // 如果是同一设备，不认为有冲突
     if (local.device.id === remote.device.id) {
       return null;
     }
     
-    // 检查数据是否有实质性差异
-    const hasDataDifference = this.hasSignificantDataDifference(local, remote);
+    // 检查是否是同一GitHub账号的不同设备
+    const localGithubUserId = await this.getGitHubUserId();
+    const remoteGithubUserId = remote.device.githubUserId;
     
+    // 如果是同一GitHub账号的不同设备，检查数据差异
+    if (localGithubUserId && remoteGithubUserId && localGithubUserId === remoteGithubUserId) {
+      const hasDataDifference = this.hasSignificantDataDifference(local, remote);
+      
+      if (hasDataDifference) {
+        // 同一账号不同设备有数据差异，返回设备冲突（需要用户选择）
+        return {
+          local,
+          remote,
+          type: 'device'
+        };
+      }
+      
+      // 同一账号不同设备无数据差异，可以直接合并
+      return null;
+    }
+    
+    // 不同账号或无法确定账号，有数据差异就是冲突
+    const hasDataDifference = this.hasSignificantDataDifference(local, remote);
     if (hasDataDifference) {
-      // 不同设备有数据差异，返回设备冲突（可自动合并）
       return {
         local,
         remote,
@@ -589,6 +628,27 @@ export class SyncManager implements ISyncManager {
   private mergeData(local: SyncData, remote: SyncData): SyncData {
     const localTime = new Date(local.timestamp).getTime();
     const remoteTime = new Date(remote.timestamp).getTime();
+    
+    // 如果本地数据更新（比如刚删除了分组），优先使用本地数据
+    if (localTime > remoteTime) {
+      console.log('Local data is newer, using local data as primary source');
+      return {
+        version: this.generateVersion(),
+        timestamp: new Date().toISOString(),
+        device: {
+          id: local.device.id,
+          name: local.device.name,
+          platform: local.device.platform
+        },
+        data: {
+          groups: local.data.groups || [],
+          settings: { ...remote.data.settings, ...local.data.settings }
+        }
+      };
+    }
+    
+    // 如果远程数据更新，进行智能合并
+    console.log('Remote data is newer or equal, performing intelligent merge');
     
     // 创建合并后的分组映射
     const mergedGroupsMap = new Map();
@@ -699,23 +759,18 @@ export class SyncManager implements ISyncManager {
    */
   private async getDeviceId(): Promise<string> {
     try {
-      // 优先使用基于GitHub用户的统一ID
-      const githubUserId = await this.getGitHubUserId();
-      if (githubUserId) {
-        return `github_user_${githubUserId}`;
-      }
-      
-      // 如果没有GitHub用户信息，使用本地设备ID
+      // 每个设备都应该有唯一的ID，即使使用同一个GitHub账号
       const result = await chrome.storage.local.get('deviceId');
       if (result.deviceId) {
         return result.deviceId;
       }
       
-      const deviceId = `device_${Math.random().toString(36).substring(2, 15)}`;
+      // 生成新的设备ID，包含时间戳确保唯一性
+      const deviceId = `device_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
       await chrome.storage.local.set({ deviceId });
       return deviceId;
     } catch (error) {
-      return `device_${Math.random().toString(36).substring(2, 15)}`;
+      return `device_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
     }
   }
 

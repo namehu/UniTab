@@ -82,6 +82,20 @@ const App: React.FC = () => {
     setGroupDetailModalOpen(true)
   }
 
+  const handleGroupUpdate = useCallback(async () => {
+    await loadData()
+    // 更新selectedGroup以反映最新状态
+    if (selectedGroup) {
+      const response = await chrome.runtime.sendMessage({ action: 'getData' })
+      if (response.success) {
+        const updatedGroup = response.data.groups.find((g: Group) => g.id === selectedGroup.id)
+        if (updatedGroup) {
+          setSelectedGroup(updatedGroup)
+        }
+      }
+    }
+  }, [loadData, selectedGroup])
+
   const handleNewGroup = async (name: string, tabs: Tab[]) => {
     await chrome.runtime.sendMessage({ action: 'createGroup', name, tabs })
     setNewGroupModalOpen(false)
@@ -110,7 +124,7 @@ const App: React.FC = () => {
         )}
       </main>
       {isGroupDetailModalOpen && selectedGroup && (
-        <GroupDetailModal group={selectedGroup} onClose={() => setGroupDetailModalOpen(false)} onUpdate={loadData} />
+        <GroupDetailModal group={selectedGroup} onClose={() => setGroupDetailModalOpen(false)} onUpdate={handleGroupUpdate} />
       )}
       {isNewGroupModalOpen && <NewGroupModal onClose={() => setNewGroupModalOpen(false)} onSave={handleNewGroup} />}
       {isSyncSettingsOpen && <SyncSettings isOpen={isSyncSettingsOpen} onClose={() => setSyncSettingsOpen(false)} />}

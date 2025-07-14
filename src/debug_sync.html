@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Sync Status</title>
+</head>
+<body>
+    <h1>Sync Debug</h1>
+    <div id="output"></div>
+    
+    <script type="module">
+        // 通过chrome.runtime.sendMessage来获取状态
+        async function getSyncStatus() {
+            return new Promise((resolve) => {
+                chrome.runtime.sendMessage({ action: 'getSyncStatus' }, (response) => {
+                    resolve(response);
+                });
+            });
+        }
+        
+        async function getRealtimeSyncStatus() {
+            return new Promise((resolve) => {
+                chrome.runtime.sendMessage({ action: 'getRealtimeSyncStatus' }, (response) => {
+                    resolve(response);
+                });
+            });
+        }
+        
+        const output = document.getElementById('output');
+        
+        async function checkStatus() {
+            try {
+                const syncStatusResponse = await getSyncStatus();
+                const realtimeStatusResponse = await getRealtimeSyncStatus();
+                
+                output.innerHTML = `
+                    <h2>Sync Manager Status:</h2>
+                    <pre>${JSON.stringify(syncStatusResponse, null, 2)}</pre>
+                    
+                    <h2>Realtime Sync Status:</h2>
+                    <pre>${JSON.stringify(realtimeStatusResponse, null, 2)}</pre>
+                `;
+            } catch (error) {
+                output.innerHTML = `<p>Error: ${error.message}</p>`;
+            }
+        }
+        
+        checkStatus();
+        
+        // 添加按钮来测试启用实时同步
+        const enableBtn = document.createElement('button');
+        enableBtn.textContent = 'Enable Realtime Sync';
+        enableBtn.onclick = async () => {
+            try {
+                const response = await new Promise((resolve) => {
+                    chrome.runtime.sendMessage({ action: 'enableRealtimeSync' }, resolve);
+                });
+                console.log('Enable response:', response);
+                checkStatus();
+            } catch (error) {
+                console.error('Failed to enable realtime sync:', error);
+            }
+        };
+        document.body.appendChild(enableBtn);
+        
+        // 添加强制同步按钮
+        const forceSyncBtn = document.createElement('button');
+        forceSyncBtn.textContent = 'Force Sync';
+        forceSyncBtn.onclick = async () => {
+            try {
+                const response = await new Promise((resolve) => {
+                    chrome.runtime.sendMessage({ action: 'forceSync' }, resolve);
+                });
+                console.log('Force sync response:', response);
+                checkStatus();
+            } catch (error) {
+                console.error('Failed to force sync:', error);
+            }
+        };
+        document.body.appendChild(forceSyncBtn);
+        
+        // 添加刷新状态按钮
+        const refreshBtn = document.createElement('button');
+        refreshBtn.textContent = 'Refresh Status';
+        refreshBtn.onclick = checkStatus;
+        document.body.appendChild(refreshBtn);
+    </script>
+</body>
+</html>

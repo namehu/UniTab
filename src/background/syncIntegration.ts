@@ -4,10 +4,11 @@
  */
 
 import { syncManager } from '../utils/sync/SyncManager';
+import { realtimeSyncManager } from '../utils/sync/RealtimeSyncManager';
 import type { SyncStatus } from '../types/sync';
 
 /**
- * 初始化同步功能
+ * 初始化同步系统
  */
 export async function initializeSync(): Promise<void> {
   try {
@@ -30,6 +31,18 @@ export async function initializeSync(): Promise<void> {
       syncManager.enableAutoSync();
       console.log('Auto sync enabled with interval:', config.syncInterval, 'minutes');
     }
+    
+    // 实时同步独立于自动同步，只要有认证就启用
+    try {
+      await realtimeSyncManager.enable();
+      if (realtimeSyncManager.isRealtimeSyncEnabled()) {
+        console.log('Realtime sync enabled');
+      } else {
+        console.log('Realtime sync not enabled - authentication required');
+      }
+    } catch (error) {
+      console.log('Failed to enable realtime sync:', error);
+    }
 
     console.log('Sync system initialized successfully');
   } catch (error) {
@@ -40,8 +53,8 @@ export async function initializeSync(): Promise<void> {
 /**
  * 处理来自其他页面的同步相关消息
  */
-export function handleSyncMessages(message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void): boolean {
-  switch (message.action) {
+export function handleSyncMessages(request: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void): boolean {
+  switch (request.action) {
     case 'sync':
       handleSyncRequest(sendResponse);
       return true; // 异步响应
@@ -63,7 +76,28 @@ export function handleSyncMessages(message: any, sender: chrome.runtime.MessageS
       return false;
 
     case 'setSyncConfig':
-      handleSetConfigRequest(message.config, sendResponse);
+      handleSetConfigRequest(request.config, sendResponse);
+      return true;
+
+    case 'getRealtimeSyncStatus':
+      sendResponse({
+        success: true,
+        enabled: realtimeSyncManager.isRealtimeSyncEnabled(),
+        pendingTasks: realtimeSyncManager.getPendingTaskCount()
+      });
+      return false;
+
+    case 'enableRealtimeSync':
+      handleEnableRealtimeSyncRequest(sendResponse);
+      return true;
+
+    case 'disableRealtimeSync':
+      realtimeSyncManager.disable();
+      sendResponse({ success: true });
+      return false;
+
+    case 'forceSync':
+      handleForceSyncRequest(sendResponse);
       return true;
 
     default:
@@ -134,6 +168,14 @@ async function handleDownloadRequest(sendResponse: (response: any) => void): Pro
 async function handleSetConfigRequest(config: any, sendResponse: (response: any) => void): Promise<void> {
   try {
     await syncManager.setConfig(config);
+    
+    // 实时同步独立于自动同步配置，只要有认证就尝试启用
+    try {
+      await realtimeSyncManager.enable();
+    } catch (error) {
+      console.log('Failed to enable realtime sync after config update:', error);
+    }
+    
     sendResponse({
       success: true,
       config: syncManager.config
@@ -142,6 +184,42 @@ async function handleSetConfigRequest(config: any, sendResponse: (response: any)
     sendResponse({
       success: false,
       error: error instanceof Error ? error.message : 'Set config failed'
+    });
+  }
+}
+
+/**
+ * 处理启用实时同步请求
+ */
+async function handleEnableRealtimeSyncRequest(sendResponse: (response: any) => void): Promise<void> {
+  try {
+    await realtimeSyncManager.enable();
+    sendResponse({
+      success: true
+    });
+  } catch (error) {
+    sendResponse({
+      success: false,
+      error: error instanceof Error ? error.message : 'Enable realtime sync failed'
+    });
+  }
+}
+
+/**
+ * 处理强制同步请求
+ */
+async function handleForceSyncRequest(sendResponse: (response: any) => void): Promise<void> {
+  try {
+    const result = await realtimeSyncManager.forceSync();
+    sendResponse({
+      success: result.success,
+      error: result.error,
+      timestamp: result.timestamp
+    });
+  } catch (error) {
+    sendResponse({
+      success: false,
+      error: error instanceof Error ? error.message : 'Force sync failed'
     });
   }
 }

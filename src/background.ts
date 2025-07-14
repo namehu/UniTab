@@ -23,6 +23,8 @@ import type {
 
 import { StorageManager, createResponse, generateId, formatDate } from './utils/storage.js'
 import { TabManager, GroupManager } from './utils/tabs.js'
+import { realtimeSyncManager } from './utils/sync/RealtimeSyncManager.js'
+import { initializeSync, handleSyncMessages } from './background/syncIntegration.js'
 
 // ==================== 初始化和事件监听 ====================
 
@@ -35,8 +37,11 @@ chrome.runtime.onInstalled.addListener(async (): Promise<void> => {
 
   try {
     await StorageManager.initialize()
+    
+    // 初始化同步系统
+    await initializeSync()
   } catch (error) {
-    console.error('Failed to initialize storage:', error)
+    console.error('Failed to initialize storage or sync:', error)
   }
 })
 
@@ -93,6 +98,9 @@ async function aggregateCurrentWindowTabs(): Promise<void> {
     await chrome.tabs.create({ url: chrome.runtime.getURL('tab_list.html') })
 
     console.log(`Saved ${tabsToSave.length} tabs to group: ${newGroup.name}`)
+    
+    // 触发实时同步
+    await realtimeSyncManager.triggerSync('aggregate_tabs', { groupId: newGroup.id, tabCount: tabsToSave.length })
   } catch (error) {
     console.error('Error aggregating tabs:', error)
   }
@@ -156,6 +164,9 @@ async function createGroup(name?: string, tabs: TabData[] = []): Promise<void> {
     }
 
     console.log(`Created group: ${newGroup.name}`)
+    
+    // 触发实时同步
+    await realtimeSyncManager.triggerSync('create_group', { groupId: newGroup.id, name: newGroup.name })
   } catch (error) {
     console.error('Error creating group:', error)
     throw error
@@ -184,6 +195,9 @@ async function updateGroupName(groupId: number, newName: string): Promise<void> 
     await StorageManager.setData(data)
 
     console.log(`Updated group name: ${groupId} -> ${newName}`)
+    
+    // 触发实时同步
+    await realtimeSyncManager.triggerSync('update_group', { groupId, newName })
   } catch (error) {
     console.error('Error updating group name:', error)
     throw error
@@ -207,6 +221,9 @@ async function toggleGroupLock(groupId: number): Promise<void> {
     await StorageManager.setData(data)
 
     console.log(`Toggled group lock: ${groupId} -> ${group.locked ? 'locked' : 'unlocked'}`)
+    
+    // 触发实时同步
+    await realtimeSyncManager.triggerSync('toggle_group_lock', { groupId, locked: group.locked })
   } catch (error) {
     console.error('Error toggling group lock:', error)
     throw error
@@ -235,6 +252,9 @@ async function deleteGroup(groupId: number): Promise<void> {
     await StorageManager.setData(data)
 
     console.log(`Deleted group: ${groupId}`)
+    
+    // 触发实时同步
+    await realtimeSyncManager.triggerSync('delete_group', { groupId })
   } catch (error) {
     console.error('Error deleting group:', error)
     throw error
@@ -345,6 +365,9 @@ async function importData(importedData: Partial<StorageData>): Promise<void> {
     await StorageManager.setData(currentData)
 
     console.log(`Imported ${importedData.groups.length} groups`)
+    
+    // 触发实时同步
+    await realtimeSyncManager.triggerSync('import_data', { groupCount: importedData.groups.length })
   } catch (error) {
     console.error('Error importing data:', error)
     throw error
@@ -359,6 +382,9 @@ async function clearAllData(): Promise<void> {
   try {
     await StorageManager.clear()
     console.log('Cleared all data')
+    
+    // 触发实时同步
+    await realtimeSyncManager.triggerSync('clear_data', {})
   } catch (error) {
     console.error('Error clearing data:', error)
     throw error
@@ -479,7 +505,12 @@ chrome.runtime.onMessage.addListener(
             break
 
           default:
-            throw new Error(`未知的操作类型: ${request.action}`)
+            // 尝试处理同步相关消息
+            const syncHandled = handleSyncMessages(request, sender, sendResponse);
+            if (!syncHandled) {
+              throw new Error(`未知的操作类型: ${request.action}`);
+            }
+            return; // 同步消息已处理，直接返回
         }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : '未知错误'

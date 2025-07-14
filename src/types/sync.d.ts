@@ -75,6 +75,7 @@ export interface SyncData {
     id: string;
     name: string;
     platform: string;
+    githubUserId?: string;
   };
   /** 实际数据 */
   data: {
