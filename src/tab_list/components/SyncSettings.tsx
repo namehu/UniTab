@@ -209,6 +209,37 @@ export const SyncSettings: React.FC<SyncSettingsProps> = ({ isOpen, onClose }) =
     }
   }
 
+  // 移除同步配置
+  const handleRemoveSync = async () => {
+    if (confirm('确定要移除同步配置吗？这将清除所有同步设置和认证信息，但不会删除本地数据。')) {
+      try {
+        // 使用SyncManager的clearConfig方法清除所有配置
+        await syncManager.clearConfig()
+        
+        // 更新本地状态
+        const defaultConfig = {
+          provider: 'github' as SyncProvider,
+          autoSync: false,
+          syncInterval: 30,
+          providerConfig: {},
+          lastSync: undefined
+        }
+        
+        setConfig(defaultConfig)
+        
+        // 重置UI状态
+        setIsAuthenticated(false)
+        setShowTokenInput(false)
+        setGithubToken('')
+        
+        alert('同步配置已移除')
+      } catch (error) {
+        console.error('Remove sync config failed:', error)
+        alert('移除同步配置失败，请重试')
+      }
+    }
+  }
+
   // 获取状态图标
   const getStatusIcon = () => {
     switch (status) {
@@ -347,9 +378,17 @@ export const SyncSettings: React.FC<SyncSettingsProps> = ({ isOpen, onClose }) =
                     )}
                   </>
                 ) : (
-                  <div className="flex items-center gap-2 text-sm text-green-600">
-                    <CheckCircle className="w-4 h-4" />
-                    <span>已认证</span>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-sm text-green-600">
+                      <CheckCircle className="w-4 h-4" />
+                      <span>已认证</span>
+                    </div>
+                    <button
+                      onClick={handleRemoveSync}
+                      className="w-full px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm"
+                    >
+                      移除同步配置
+                    </button>
                   </div>
                 )}
               </div>

@@ -73,6 +73,39 @@ export class SyncManager implements ISyncManager {
   }
 
   /**
+   * 清除同步配置
+   */
+  async clearConfig(): Promise<void> {
+    try {
+      // 停止自动同步
+      this.disableAutoSync();
+      
+      // 重置配置为默认值
+      this._config = {
+        provider: 'github',
+        autoSync: false,
+        syncInterval: 30,
+        providerConfig: {},
+        lastSync: undefined
+      };
+      
+      // 清除存储的配置
+      await chrome.storage.local.remove(['syncConfig', 'sync_github_config', 'lastSyncData']);
+      
+      // 清除提供商
+      this.provider = null;
+      
+      // 重置状态
+      this.setStatus('idle');
+      
+      console.log('Sync config cleared successfully');
+    } catch (error) {
+      console.error('Clear sync config failed:', error);
+      throw error;
+    }
+  }
+
+  /**
    * 手动同步
    */
   async sync(): Promise<SyncResult> {
