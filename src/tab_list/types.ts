@@ -57,6 +57,8 @@ export interface HeaderProps {
   onNewGroup: () => void;
   /** 打开设置回调函数 */
   onOpenSettings: () => void;
+  /** 打开同步设置回调函数 */
+  onOpenSyncSettings: () => void;
 }
 
 /**

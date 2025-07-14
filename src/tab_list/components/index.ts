@@ -8,3 +8,4 @@ export { Toolbar } from './Toolbar';
 export { GroupList } from './GroupList';
 export { GroupDetailModal } from './GroupDetailModal';
 export { NewGroupModal } from './NewGroupModal';
+export { SyncSettings } from './SyncSettings';

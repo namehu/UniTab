@@ -1,4 +1,5 @@
 import React from 'react';
+import { Cloud } from 'lucide-react';
 import type { HeaderProps } from '../types';
 
 /**
@@ -8,7 +9,8 @@ import type { HeaderProps } from '../types';
 export const Header: React.FC<HeaderProps> = ({ 
   onSearch, 
   onNewGroup, 
-  onOpenSettings 
+  onOpenSettings,
+  onOpenSyncSettings 
 }) => {
   return (
     <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-20">
@@ -43,6 +45,15 @@ export const Header: React.FC<HeaderProps> = ({
               title="创建新的标签页分组"
             >
               新建分组
+            </button>
+            
+            {/* 同步设置按钮 */}
+            <button
+              onClick={onOpenSyncSettings}
+              className="p-2 rounded-full hover:bg-gray-100"
+              title="同步设置"
+            >
+              <Cloud className="w-6 h-6 text-gray-600" />
             </button>
             
             {/* 设置按钮 */}
