@@ -21,10 +21,29 @@ import type {
   ChromeTab
 } from './types/background.js'
 
-import { StorageManager, createResponse, generateId, formatDate } from './utils/storage.js'
+import { StorageManager, createResponse, generateId, formatDate, updateDataMetadata } from './utils/storage.js'
 import { TabManager, GroupManager } from './utils/tabs.js'
-import { realtimeSyncManager } from './utils/sync/RealtimeSyncManager.js'
+import { syncManager } from './utils/sync/SyncManager.js'
 import { initializeSync, handleSyncMessages } from './background/syncIntegration.js'
+
+/**
+ * 检查同步是否启用并触发同步
+ */
+async function triggerSyncIfEnabled(): Promise<void> {
+  try {
+    const storageData = await StorageManager.getData()
+    if (!storageData.settings?.sync?.enabled) {
+      return // 同步未启用，跳过
+    }
+    
+    // 异步触发同步，不等待结果
+    syncManager.sync().catch(error => {
+      console.log('Background sync failed:', error)
+    })
+  } catch (error) {
+    console.error('Error checking sync status:', error)
+  }
+}
 
 // ==================== 初始化和事件监听 ====================
 
@@ -88,6 +107,10 @@ async function aggregateCurrentWindowTabs(): Promise<void> {
 
     // 保存到存储
     data.groups.unshift(newGroup) // 添加到开头
+    
+    // 更新元数据
+    updateDataMetadata(data)
+    
     await StorageManager.setData(data)
 
     // 关闭已保存的标签页
@@ -100,7 +123,8 @@ async function aggregateCurrentWindowTabs(): Promise<void> {
     console.log(`Saved ${tabsToSave.length} tabs to group: ${newGroup.name}`)
     
     // 触发实时同步
-    await realtimeSyncManager.triggerSync('aggregate_tabs', { groupId: newGroup.id, tabCount: tabsToSave.length })
+    // 触发同步（如果启用）
+    await triggerSyncIfEnabled()
   } catch (error) {
     console.error('Error aggregating tabs:', error)
   }
@@ -155,6 +179,10 @@ async function createGroup(name?: string, tabs: TabData[] = []): Promise<void> {
     }
 
     data.groups.unshift(newGroup)
+    
+    // 更新元数据
+    updateDataMetadata(data)
+    
     await StorageManager.setData(data)
 
     // 关闭已保存的标签页（如果有ID）
@@ -166,7 +194,8 @@ async function createGroup(name?: string, tabs: TabData[] = []): Promise<void> {
     console.log(`Created group: ${newGroup.name}`)
     
     // 触发实时同步
-    await realtimeSyncManager.triggerSync('create_group', { groupId: newGroup.id, name: newGroup.name })
+    // 触发同步（如果启用）
+    await triggerSyncIfEnabled()
   } catch (error) {
     console.error('Error creating group:', error)
     throw error
@@ -192,12 +221,17 @@ async function updateGroupName(groupId: number, newName: string): Promise<void> 
     }
 
     group.name = newName
+    
+    // 更新元数据
+    updateDataMetadata(data)
+    
     await StorageManager.setData(data)
 
     console.log(`Updated group name: ${groupId} -> ${newName}`)
     
     // 触发实时同步
-    await realtimeSyncManager.triggerSync('update_group', { groupId, newName })
+    // 触发同步（如果启用）
+    await triggerSyncIfEnabled()
   } catch (error) {
     console.error('Error updating group name:', error)
     throw error
@@ -218,12 +252,17 @@ async function toggleGroupLock(groupId: number): Promise<void> {
     }
 
     group.locked = !group.locked
+    
+    // 更新元数据
+    updateDataMetadata(data)
+    
     await StorageManager.setData(data)
 
     console.log(`Toggled group lock: ${groupId} -> ${group.locked ? 'locked' : 'unlocked'}`)
     
     // 触发实时同步
-    await realtimeSyncManager.triggerSync('toggle_group_lock', { groupId, locked: group.locked })
+    // 触发同步（如果启用）
+    await triggerSyncIfEnabled()
   } catch (error) {
     console.error('Error toggling group lock:', error)
     throw error
@@ -249,12 +288,17 @@ async function deleteGroup(groupId: number): Promise<void> {
     }
 
     data.groups.splice(groupIndex, 1)
+    
+    // 更新元数据
+    updateDataMetadata(data)
+    
     await StorageManager.setData(data)
 
     console.log(`Deleted group: ${groupId}`)
     
     // 触发实时同步
-    await realtimeSyncManager.triggerSync('delete_group', { groupId })
+    // 触发同步（如果启用）
+    await triggerSyncIfEnabled()
   } catch (error) {
     console.error('Error deleting group:', error)
     throw error
@@ -362,12 +406,17 @@ async function importData(importedData: Partial<StorageData>): Promise<void> {
     })
 
     currentData.groups.push(...importedData.groups)
+    
+    // 更新元数据
+    updateDataMetadata(currentData)
+    
     await StorageManager.setData(currentData)
 
     console.log(`Imported ${importedData.groups.length} groups`)
     
     // 触发实时同步
-    await realtimeSyncManager.triggerSync('import_data', { groupCount: importedData.groups.length })
+    // 触发同步（如果启用）
+    await triggerSyncIfEnabled()
   } catch (error) {
     console.error('Error importing data:', error)
     throw error
@@ -384,7 +433,8 @@ async function clearAllData(): Promise<void> {
     console.log('Cleared all data')
     
     // 触发实时同步
-    await realtimeSyncManager.triggerSync('clear_data', {})
+    // 触发同步（如果启用）
+    await triggerSyncIfEnabled()
   } catch (error) {
     console.error('Error clearing data:', error)
     throw error
@@ -526,24 +576,3 @@ chrome.runtime.onMessage.addListener(
     return true
   }
 )
-
-// ==================== 模块导出（用于测试） ====================
-
-// 仅在非浏览器环境下导出（用于单元测试）
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = {
-    aggregateCurrentWindowTabs,
-    getStorageData,
-    restoreTabs,
-    createGroup,
-    updateGroupName,
-    toggleGroupLock,
-    deleteGroup,
-    getStatistics,
-    exportData,
-    importData,
-    clearAllData,
-    generateFavIconUrl,
-    createResponse
-  }
-}

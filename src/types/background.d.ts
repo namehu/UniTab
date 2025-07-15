@@ -32,6 +32,8 @@ export interface TabGroup {
 
 // 同步设置
 export interface SyncSettings {
+  /** 是否启用同步 */
+  enabled: boolean;
   /** 同步服务提供商 */
   provider: string | null;
   /** GitHub Gist ID */
@@ -48,10 +50,22 @@ export interface AppSettings {
   excludeList: string[];
 }
 
+// 元数据结构
+export interface DataMetadata {
+  /** 本地数据最后修改时间 */
+  lastModified: string;
+  /** 最后成功同步时间戳 */
+  lastSyncTimestamp: string;
+  /** 设备唯一标识 */
+  deviceId: string;
+}
+
 // 主数据结构
 export interface StorageData {
   /** 数据版本号 */
   version: string;
+  /** 元数据 */
+  metadata: DataMetadata;
   /** 应用设置 */
   settings: AppSettings;
   /** 标签页分组列表 */

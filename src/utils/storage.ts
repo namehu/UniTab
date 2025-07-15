@@ -8,11 +8,27 @@ import type { StorageData, MessageResponse } from '../types/background.js';
 /** 数据存储键名 */
 export const STORAGE_KEY = 'tabSorterData' as const;
 
+/**
+ * 生成设备唯一标识符
+ * @returns 设备ID
+ */
+export function generateDeviceId(): string {
+  const timestamp = Date.now().toString(36);
+  const random = Math.random().toString(36).substring(2, 8);
+  return `device_${timestamp}_${random}`;
+}
+
 /** 默认数据结构 */
 export const DEFAULT_DATA: StorageData = {
-  version: '1.0.0',
+  version: '1.2.0',
+  metadata: {
+    lastModified: new Date().toISOString(),
+    lastSyncTimestamp: '',
+    deviceId: generateDeviceId()
+  },
   settings: {
     sync: {
+      enabled: false,
       provider: null,
       gistId: null,
       lastSync: null
@@ -39,7 +55,14 @@ export class StorageManager {
   static async getData(): Promise<StorageData> {
     try {
       const result = await chrome.storage.local.get(STORAGE_KEY);
-      return result[STORAGE_KEY] || DEFAULT_DATA;
+      const data = result[STORAGE_KEY];
+      
+      if (!data) {
+        return DEFAULT_DATA;
+      }
+      
+      // 确保数据结构完整性
+      return this.validateAndFixData(data);
     } catch (error) {
       console.error('Failed to get storage data:', error);
       return DEFAULT_DATA;
@@ -100,6 +123,47 @@ export class StorageManager {
       console.error('Failed to get storage usage:', error);
       return 0;
     }
+  }
+
+  /**
+   * 验证并修复数据结构
+   * @param data 原始数据
+   * @returns 验证后的数据
+   */
+  static validateAndFixData(data: any): StorageData {
+    // 如果数据结构完整，直接返回
+    if (data.version === '1.2.0' && data.metadata && data.settings && data.groups) {
+      return data as StorageData;
+    }
+
+    console.log('Fixing data structure to version 1.2.0');
+
+    // 修复数据结构
+    const fixedData: StorageData = {
+      version: '1.2.0',
+      metadata: data.metadata || {
+        lastModified: new Date().toISOString(),
+        lastSyncTimestamp: data.settings?.sync?.lastSync || '',
+        deviceId: generateDeviceId()
+      },
+      settings: {
+        sync: {
+          enabled: data.settings?.sync?.enabled ?? false,
+          provider: data.settings?.sync?.provider || null,
+          gistId: data.settings?.sync?.gistId || null,
+          lastSync: data.settings?.sync?.lastSync || null
+        },
+        excludeList: data.settings?.excludeList || DEFAULT_DATA.settings.excludeList
+      },
+      groups: data.groups || []
+    };
+
+    // 自动保存修复后的数据
+    this.setData(fixedData).catch(error => {
+      console.error('Failed to save fixed data:', error);
+    });
+
+    return fixedData;
   }
 }
 
@@ -175,6 +239,23 @@ export function shouldExcludeUrl(url: string, excludeList: string[]): boolean {
  */
 export function generateId(): number {
   return Date.now();
+}
+
+
+
+/**
+ * 更新数据的元数据
+ * @param data 要更新的数据
+ * @returns 更新后的数据
+ */
+export function updateDataMetadata(data: StorageData): StorageData {
+  return {
+    ...data,
+    metadata: {
+      ...data.metadata,
+      lastModified: new Date().toISOString()
+    }
+  };
 }
 
 /**

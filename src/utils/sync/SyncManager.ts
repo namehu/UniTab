@@ -80,10 +80,7 @@ export class SyncManager implements ISyncManager {
       // 停止自动同步
       this.disableAutoSync();
 
-      // 禁用实时同步
-      const { RealtimeSyncManager } = await import('./RealtimeSyncManager');
-      const realtimeSyncManager = RealtimeSyncManager.getInstance();
-      realtimeSyncManager.disable();
+      // 注意：实时同步功能已集成到操作流程中
 
       // 重置配置为默认值
       this._config = {
@@ -115,8 +112,22 @@ export class SyncManager implements ISyncManager {
    */
   async sync(): Promise<SyncResult> {
     try {
-      console.log('=== Starting manual sync ===');
+      console.log('=== Starting sync ===');
       this.setStatus('syncing');
+
+      // 第一步：检查 sync.enabled 状态
+      const localData = await StorageManager.getData();
+      if (!localData.settings.sync.enabled) {
+        console.log('🔴 Sync is disabled, skipping sync');
+        this.setStatus('idle');
+        return {
+          success: true,
+          message: '同步已禁用，不执行任何操作',
+          timestamp: new Date().toISOString()
+        };
+      }
+
+      console.log('🟢 Sync is enabled, proceeding with sync');
 
       if (!this.provider) {
         console.log('No provider, initializing...');
@@ -144,129 +155,103 @@ export class SyncManager implements ISyncManager {
         };
       }
 
-      // 获取本地数据
-      const localData = await this.getLocalData();
-      console.log('Local data timestamp:', localData.timestamp);
-      console.log('Local groups count:', localData.data.groups?.length || 0);
+      // 第二步：获取本地和远程数据
+      console.log('📥 Getting local data...');
+      const localStorageData = await StorageManager.getData();
+      const localSyncData = this.convertToSyncData(localStorageData);
+      console.log('Local data:', localSyncData);
 
-      const hasLocalData = localData.data.groups && localData.data.groups.length > 0;
-      console.log('Has local data:', hasLocalData);
-
-      // 尝试下载远程数据
-      console.log('Checking for remote data...');
+      console.log('📡 Getting remote data...');
       let remoteData: SyncData | null = null;
-      let hasRemoteData = false;
-
       try {
         remoteData = await this.provider.download();
-        hasRemoteData = remoteData && remoteData.data.groups && remoteData.data.groups.length > 0;
-        console.log('Remote data downloaded:', {
-          timestamp: remoteData?.timestamp,
-          device: remoteData?.device,
-          groupsCount: remoteData?.data.groups?.length || 0,
-          hasRemoteData
-        });
+        console.log('Remote data:', remoteData);
       } catch (error) {
         console.log('No remote data found or download failed');
-        hasRemoteData = false;
       }
 
-      // 根据本地和远程数据的存在情况进行处理
-      if (!hasLocalData && hasRemoteData) {
-        // 情况1: 本地没有，远程有 - 拉取远程数据
-        console.log('Case 1: No local data, has remote data - downloading remote data');
-        await this.saveLocalData(remoteData!);
-        this._config.lastSync = new Date().toISOString();
-        await this.saveConfig();
-        this.setStatus('success');
-        return {
-          success: true,
-          message: '已从远程同步数据到本地',
-          timestamp: new Date().toISOString(),
-          version: remoteData!.version
-        };
-      } else if (hasLocalData && !hasRemoteData) {
-        // 情况2: 本地有，远程没有 - 推送到远程
-        console.log('Case 2: Has local data, no remote data - uploading local data');
-        const uploadResult = await this.provider.upload(localData);
-        if (uploadResult.success) {
+      // 第三步：基于元数据的智能同步决策
+      const syncDecision = this.makeSyncDecision(localStorageData, remoteData);
+      console.log('🤖 Sync decision:', syncDecision);
+
+      switch (syncDecision.action) {
+        case 'upload_local':
+          console.log('📤 Uploading local data to remote...');
+          const uploadResult = await this.provider.upload(localSyncData);
+          if (uploadResult.success) {
+            await this.updateSyncMetadata(localStorageData);
+            this._config.lastSync = new Date().toISOString();
+            await this.saveConfig();
+            this.setStatus('success');
+            return {
+              success: true,
+              message: syncDecision.reason,
+              timestamp: new Date().toISOString(),
+              version: localSyncData.version
+            };
+          }
+          this.setStatus('error');
+          return uploadResult;
+
+        case 'download_remote':
+          console.log('📥 Downloading remote data to local...');
+          const downloadedData = this.convertFromSyncData(remoteData!);
+          await StorageManager.setData(downloadedData);
           this._config.lastSync = new Date().toISOString();
           await this.saveConfig();
           this.setStatus('success');
           return {
             success: true,
-            message: '已将本地数据同步到远程',
+            message: syncDecision.reason,
             timestamp: new Date().toISOString(),
-            version: localData.version
+            version: remoteData!.version
           };
-        }
-        this.setStatus('error');
-        return uploadResult;
-      } else if (!hasLocalData && !hasRemoteData) {
-        // 本地和远程都没有数据
-        console.log('No data found locally or remotely');
-        this.setStatus('success');
-        return {
-          success: true,
-          message: '本地和远程均无数据',
-          timestamp: new Date().toISOString()
-        };
+
+        case 'merge':
+          console.log('🔄 Performing three-way merge...');
+          const mergedData = this.performThreeWayMerge(localSyncData, remoteData!, localStorageData.metadata);
+          const mergedStorageData = this.convertFromSyncData(mergedData);
+          await StorageManager.setData(mergedStorageData);
+          const mergeUploadResult = await this.provider.upload(mergedData);
+          if (mergeUploadResult.success) {
+            this._config.lastSync = new Date().toISOString();
+            await this.saveConfig();
+            this.setStatus('success');
+            return {
+              success: true,
+              message: syncDecision.reason,
+              merged: true,
+              timestamp: new Date().toISOString(),
+              version: mergedData.version
+            };
+          }
+          this.setStatus('error');
+          return mergeUploadResult;
+
+        case 'conflict':
+          this.setStatus('error');
+          return {
+            success: false,
+            message: syncDecision.reason,
+            timestamp: new Date().toISOString(),
+            conflict: {
+              local: localSyncData,
+              remote: remoteData!,
+              type: 'device'
+            }
+          };
+
+        case 'no_action':
+          this.setStatus('success');
+          return {
+            success: true,
+            message: syncDecision.reason,
+            timestamp: new Date().toISOString()
+          };
+
+        default:
+          throw new Error(`Unknown sync action: ${(syncDecision as any).action}`);
       }
-
-      // 情况3: 本地有，远程也有 - 检测冲突并处理
-      console.log('Case 3: Both local and remote data exist - checking for conflicts');
-      if (!remoteData) {
-        throw new Error('Remote data should exist but is null');
-      }
-
-      // 检测是否存在冲突
-      const conflict = await this.detectConflict(localData, remoteData);
-
-      if (conflict) {
-        console.log('Conflict detected between local and remote data');
-        this.setStatus('error');
-        return {
-          success: false,
-          conflict,
-          message: '检测到同步冲突，需要用户选择解决方案',
-          timestamp: new Date().toISOString()
-        };
-      }
-
-      // 没有冲突，进行智能合并
-      console.log('No conflict detected, performing intelligent merge');
-      const mergedData = this.mergeData(localData, remoteData);
-      console.log('Merged data groups count:', mergedData.data.groups?.length || 0);
-
-      // 保存合并后的数据到本地
-      await this.saveLocalData(mergedData);
-      console.log('Merged data saved locally');
-
-      // 上传合并后的数据到远程
-      console.log('Uploading merged data to remote...');
-      const uploadResult = await this.provider.upload(mergedData);
-
-      if (uploadResult.success) {
-        this._config.lastSync = new Date().toISOString();
-        await this.saveConfig();
-        this.setStatus('success');
-        console.log('Intelligent merge and upload completed successfully');
-
-        return {
-          success: true,
-          message: '数据已智能合并并同步完成',
-          merged: true,
-          timestamp: new Date().toISOString(),
-          version: mergedData.version
-        };
-      }
-      this.setStatus('error');
-      console.error('Upload failed after merge:', uploadResult.error);
-      return {
-        success: false,
-        error: '数据合并成功，但上传失败：' + uploadResult.error,
-        timestamp: new Date().toISOString()
-      };
     } catch (error) {
       console.error('Sync failed:', error);
       this.setStatus('error');
@@ -279,11 +264,23 @@ export class SyncManager implements ISyncManager {
   }
 
   /**
-   * 上传到远程
+   * 上传本地数据到远程
    */
   async upload(): Promise<SyncResult> {
     try {
       this.setStatus('syncing');
+
+      // 检查 sync.enabled 状态
+      const localStorageData = await StorageManager.getData();
+      if (!localStorageData.settings.sync.enabled) {
+        console.log('🔴 Sync is disabled, skipping upload');
+        this.setStatus('idle');
+        return {
+          success: true,
+          message: '同步已禁用，不执行上传操作',
+          timestamp: new Date().toISOString()
+        };
+      }
 
       if (!this.provider) {
         await this.initializeProvider();
@@ -317,11 +314,23 @@ export class SyncManager implements ISyncManager {
   }
 
   /**
-   * 从远程下载
+   * 从远程下载数据
    */
   async download(): Promise<SyncResult> {
     try {
       this.setStatus('syncing');
+
+      // 检查 sync.enabled 状态
+      const localStorageData = await StorageManager.getData();
+      if (!localStorageData.settings.sync.enabled) {
+        console.log('🔴 Sync is disabled, skipping download');
+        this.setStatus('idle');
+        return {
+          success: true,
+          message: '同步已禁用，不执行下载操作',
+          timestamp: new Date().toISOString()
+        };
+      }
 
       if (!this.provider) {
         await this.initializeProvider();
@@ -412,10 +421,18 @@ export class SyncManager implements ISyncManager {
     this.disableAutoSync(); // 先清除现有的定时器
 
     if (this._config.syncInterval > 0) {
-      this.autoSyncTimer = setInterval(() => {
-        this.sync().catch((error) => {
+      this.autoSyncTimer = setInterval(async () => {
+        try {
+          // 在每次自动同步前检查sync.enabled状态
+          const localData = await StorageManager.getData();
+          if (!localData.settings.sync.enabled) {
+            console.log('🔴 Sync is disabled, skipping auto sync');
+            return;
+          }
+          await this.sync();
+        } catch (error) {
           console.error('Auto sync failed:', error);
-        });
+        }
       }, this._config.syncInterval * 60 * 1000); // 转换为毫秒
     }
   }
@@ -549,46 +566,187 @@ export class SyncManager implements ISyncManager {
   }
 
   /**
-   * 检测同步冲突
+   * 基于元数据的智能同步决策
    */
-  private async detectConflict(local: SyncData, remote: SyncData): Promise<SyncConflict | null> {
-    // 如果是同一设备，不认为有冲突
-    if (local.device.id === remote.device.id) {
-      return null;
-    }
+  private makeSyncDecision(localData: any, remoteData: SyncData | null): {
+    action: 'upload_local' | 'download_remote' | 'merge' | 'conflict' | 'no_action';
+    reason: string;
+  } {
+    const hasLocalGroups = localData.groups && localData.groups.length > 0;
+    const hasRemoteData = remoteData && remoteData.data.groups && remoteData.data.groups.length > 0;
+    
+    console.log('📊 Sync decision analysis:', {
+      hasLocalGroups,
+      hasRemoteData,
+      localLastModified: localData.metadata?.lastModified,
+      localLastSync: localData.metadata?.lastSyncTimestamp,
+      remoteTimestamp: remoteData?.timestamp
+    });
 
-    // 检查是否是同一GitHub账号的不同设备
-    const localGithubUserId = await this.getGitHubUserId();
-    const remoteGithubUserId = remote.device.githubUserId;
-
-    // 如果是同一GitHub账号的不同设备，检查数据差异
-    if (localGithubUserId && remoteGithubUserId && localGithubUserId === remoteGithubUserId) {
-      const hasDataDifference = this.hasSignificantDataDifference(local, remote);
-
-      if (hasDataDifference) {
-        // 同一账号不同设备有数据差异，返回设备冲突（需要用户选择）
-        return {
-          local,
-          remote,
-          type: 'device'
-        };
-      }
-
-      // 同一账号不同设备无数据差异，可以直接合并
-      return null;
-    }
-
-    // 不同账号或无法确定账号，有数据差异就是冲突
-    const hasDataDifference = this.hasSignificantDataDifference(local, remote);
-    if (hasDataDifference) {
+    // 情况1：本地没有数据，远程有数据
+    if (!hasLocalGroups && hasRemoteData) {
       return {
-        local,
-        remote,
-        type: 'device'
+        action: 'download_remote',
+        reason: '本地无数据，从远程下载数据'
       };
     }
 
-    return null;
+    // 情况2：本地有数据，远程没有数据
+    if (hasLocalGroups && !hasRemoteData) {
+      return {
+        action: 'upload_local',
+        reason: '远程无数据，上传本地数据'
+      };
+    }
+
+    // 情况3：两边都没有数据
+    if (!hasLocalGroups && !hasRemoteData) {
+      return {
+        action: 'no_action',
+        reason: '本地和远程均无数据，无需同步'
+      };
+    }
+
+    // 情况4：两边都有数据，需要智能决策
+    if (hasLocalGroups && hasRemoteData) {
+      const localLastModified = new Date(localData.metadata?.lastModified || 0).getTime();
+      const localLastSync = new Date(localData.metadata?.lastSyncTimestamp || 0).getTime();
+      const remoteTimestamp = new Date(remoteData!.timestamp).getTime();
+      
+      // 检查是否来自同一设备
+      const isSameDevice = localData.metadata?.deviceId === remoteData!.device?.id;
+      
+      // 如果本地数据在上次同步后被修改，且远程数据也比上次同步新
+      if (localLastModified > localLastSync && remoteTimestamp > localLastSync) {
+        if (isSameDevice) {
+          // 同一设备，选择较新的数据
+          return localLastModified > remoteTimestamp ? {
+            action: 'upload_local',
+            reason: '同设备数据冲突，本地数据较新，上传本地数据'
+          } : {
+            action: 'download_remote', 
+            reason: '同设备数据冲突，远程数据较新，下载远程数据'
+          };
+        }
+        
+        // 不同设备，需要用户解决冲突
+        return {
+          action: 'conflict',
+          reason: '检测到来自不同设备的数据冲突，需要用户选择解决方案'
+        };
+      }
+      
+      // 如果只有本地数据被修改
+      if (localLastModified > localLastSync) {
+        return {
+          action: 'upload_local',
+          reason: '本地数据有更新，上传到远程'
+        };
+      }
+      
+      // 如果只有远程数据更新
+      if (remoteTimestamp > localLastSync) {
+        return {
+          action: 'download_remote',
+          reason: '远程数据有更新，下载到本地'
+        };
+      }
+      
+      // 两边数据都没有变化
+      return {
+        action: 'no_action',
+        reason: '数据已同步，无需操作'
+      };
+    }
+
+    // 默认情况
+    return {
+      action: 'no_action',
+      reason: '无法确定同步策略'
+    };
+  }
+
+  /**
+   * 转换存储数据为同步数据格式
+   */
+  private convertToSyncData(storageData: any): SyncData {
+    return {
+      version: this.generateVersion(),
+      timestamp: new Date().toISOString(),
+      device: {
+        id: storageData.metadata?.deviceId || 'unknown',
+        name: storageData.metadata?.deviceName || 'Unknown Device',
+        platform: this.getPlatform()
+      },
+      data: {
+        groups: storageData.groups || [],
+        settings: storageData.settings || {}
+      }
+    };
+  }
+
+  /**
+   * 转换同步数据为存储数据格式
+   */
+  private convertFromSyncData(syncData: SyncData): any {
+    return {
+      groups: syncData.data.groups || [],
+      settings: syncData.data.settings || {},
+      metadata: {
+        deviceId: syncData.device.id,
+        deviceName: syncData.device.name,
+        lastSyncTimestamp: syncData.timestamp,
+        lastModified: syncData.timestamp
+      }
+    };
+  }
+
+  /**
+   * 执行三路合并
+   */
+  private performThreeWayMerge(local: SyncData, remote: SyncData, metadata: any): SyncData {
+    // 简化的三路合并实现
+    const mergedGroups = [...(local.data.groups || []), ...(remote.data.groups || [])];
+    const uniqueGroups = mergedGroups.filter((group, index, self) => 
+      index === self.findIndex(g => g.id === group.id)
+    );
+
+    const mergedSettings = {
+      ...local.data.settings,
+      ...remote.data.settings
+    };
+
+    return {
+      version: this.generateVersion(),
+      timestamp: new Date().toISOString(),
+      device: local.device,
+      data: {
+        groups: uniqueGroups,
+        settings: mergedSettings
+      }
+    };
+  }
+
+  /**
+   * 更新同步元数据
+   */
+  private async updateSyncMetadata(storageData: any): Promise<void> {
+    const deviceId = await this.getDeviceId();
+    const deviceName = await this.getDeviceName();
+    const now = new Date().toISOString();
+
+    const updatedMetadata = {
+      ...storageData.metadata,
+      deviceId,
+      deviceName,
+      lastSyncTimestamp: now,
+      lastModified: now
+    };
+
+    await StorageManager.setData({
+      ...storageData,
+      metadata: updatedMetadata
+    });
   }
 
   /**
@@ -757,19 +915,64 @@ export class SyncManager implements ISyncManager {
    */
   private async getDeviceId(): Promise<string> {
     try {
-      // 每个设备都应该有唯一的ID，即使使用同一个GitHub账号
-      const result = await chrome.storage.local.get('deviceId');
-      if (result.deviceId) {
-        return result.deviceId;
+      const storageData = await StorageManager.getData();
+      if (storageData.metadata?.deviceId) {
+        return storageData.metadata.deviceId;
       }
 
-      // 生成新的设备ID，包含时间戳确保唯一性
+      // 生成新的设备ID
       const deviceId = `device_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
-      await chrome.storage.local.set({ deviceId });
+      
+      // 更新存储数据
+      const updatedData = {
+        ...storageData,
+        metadata: {
+          ...storageData.metadata,
+          deviceId
+        }
+      };
+      await StorageManager.setData(updatedData);
+      
       return deviceId;
     } catch (error) {
       return `device_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
     }
+  }
+
+  /**
+   * 获取设备名称
+   */
+  private async getDeviceName(): Promise<string> {
+    try {
+      // 尝试获取GitHub用户信息来构建更有意义的设备名称
+      const githubUserInfo = await this.getGitHubUserInfo();
+      if (githubUserInfo) {
+        const platform = this.getPlatform();
+        const deviceName = `${githubUserInfo.login}'s ${platform} Device`;
+        return deviceName;
+      }
+
+      // 如果没有GitHub用户信息，使用缓存的设备名称
+      const result = await chrome.storage.local.get('deviceName');
+      if (result.deviceName) {
+        return result.deviceName;
+      }
+
+      // 生成设备名称
+      const platform = this.getPlatform();
+      const deviceName = `Chrome on ${platform}`;
+      await chrome.storage.local.set({ deviceName });
+      return deviceName;
+    } catch (error) {
+      return `Chrome on ${this.getPlatform()}`;
+    }
+  }
+
+  /**
+   * 获取平台信息
+   */
+  private getPlatform(): string {
+    return 'Chrome Extension';
   }
 
   /**
@@ -824,32 +1027,7 @@ export class SyncManager implements ISyncManager {
     }
   }
 
-  /**
-   * 获取设备名称
-   */
-  private async getDeviceName(): Promise<string> {
-    try {
-      // 尝试获取GitHub用户信息来构建更有意义的设备名称
-      const githubUserInfo = await this.getGitHubUserInfo();
-      if (githubUserInfo) {
-        const platform = this.getPlatform();
-        const deviceName = `${githubUserInfo.login}'s ${platform} Device`;
-        return deviceName;
-      }
 
-      // 如果没有GitHub用户信息，使用缓存的设备名称
-      const result = await chrome.storage.local.get('deviceName');
-      if (result.deviceName) {
-        return result.deviceName;
-      }
-
-      const deviceName = `Chrome on ${this.getPlatform()}`;
-      await chrome.storage.local.set({ deviceName });
-      return deviceName;
-    } catch (error) {
-      return `Chrome on ${this.getPlatform()}`;
-    }
-  }
 
   /**
    * 获取GitHub用户信息
@@ -875,16 +1053,7 @@ export class SyncManager implements ISyncManager {
     }
   }
 
-  /**
-   * 获取平台信息
-   */
-  private getPlatform(): string {
-    const userAgent = navigator.userAgent;
-    if (userAgent.includes('Windows')) return 'Windows';
-    if (userAgent.includes('Mac')) return 'macOS';
-    if (userAgent.includes('Linux')) return 'Linux';
-    return 'Unknown';
-  }
+
 
   /**
    * 保存配置

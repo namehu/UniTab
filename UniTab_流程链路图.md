@@ -14,7 +14,6 @@ graph TB
         E[Storage Manager]
         F[Tab Manager]
         G[Sync Manager]
-        H[Realtime Sync Manager]
     end
     
     subgraph "数据存储层"
@@ -27,11 +26,10 @@ graph TB
     C --> D
     D --> E
     D --> F
-    D --> G
-    D --> H
+
     E --> I
     G --> J
-    H --> G
+    D --> G
 ```
 
 ## 2. 标签处理流程
@@ -45,7 +43,6 @@ sequenceDiagram
     participant BG as Background
     participant TM as TabManager
     participant SM as StorageManager
-    participant RS as RealtimeSyncManager
     
     U->>P: 点击"聚合标签"按钮
     P->>BG: 发送 aggregateTabs 消息
@@ -56,12 +53,11 @@ sequenceDiagram
     BG->>SM: 保存新分组到本地存储
     SM->>BG: 保存成功
     BG->>TM: 关闭已聚合的标签页
-    BG->>RS: 触发实时同步 (create_group)
-    RS->>RS: 检查认证状态
-    alt 认证成功
-        RS->>SyncManager: 执行同步
-    else 认证失败
-        RS->>RS: 记录待处理任务
+    BG->>BG: 检查同步启用状态
+    alt 同步已启用
+        BG->>SyncManager: 异步执行同步
+    else 同步未启用
+        BG->>BG: 跳过同步
     end
     BG->>P: 返回成功响应
     P->>U: 显示成功提示
@@ -109,9 +105,9 @@ flowchart TD
     B -->|锁定/解锁| H[切换锁定状态]
     H --> I[保存到存储]
     
-    D --> J[触发实时同步 delete_group]
-    G --> K[触发实时同步 update_group]
-    I --> L[触发实时同步 toggle_group_lock]
+    D --> J[触发同步]
+    G --> K[触发同步]
+    I --> L[触发同步]
     
     J --> M[同步到远程]
     K --> M
@@ -120,38 +116,76 @@ flowchart TD
 
 ## 3. 远程同步机制
 
-### 3.1 同步系统架构
+### 3.1 同步系统初始化流程
+
+```mermaid
+sequenceDiagram
+    participant BG as Background Script
+    participant SI as SyncIntegration
+    participant SM as SyncManager
+    participant ST as Storage
+    
+    Note over BG: 扩展启动时
+    BG->>SI: initializeSync()
+    SI->>ST: 检查 sync.enabled 状态
+    ST->>SI: 返回 sync.enabled 值
+    
+    alt sync.enabled = false
+        SI->>BG: 记录日志：同步已禁用
+        Note over SI: "Sync is disabled, skipping initialization"
+    else sync.enabled = true
+        SI->>SM: 初始化 SyncManager
+        SM->>SM: 加载同步配置
+        SM->>SM: 检查认证状态
+        
+        Note over SI: 实时同步已集成到操作流程中
+        
+        SI->>SI: 设置定期同步
+        loop 每次定期同步
+            SI->>ST: 检查 sync.enabled 状态
+            alt sync.enabled = true
+                SI->>SM: 执行定期同步
+            else sync.enabled = false
+                SI->>SI: 跳过定期同步
+            end
+        end
+    end
+```
+
+### 3.2 同步系统架构
 
 ```mermaid
 graph TB
     subgraph "同步管理层"
         A[SyncManager 同步管理器]
-        B[RealtimeSyncManager 实时同步管理器]
         C[GitHubSyncProvider GitHub提供商]
+        D[SyncIntegration 同步集成]
     end
     
-    subgraph "认证层"
-        D[GitHub Token 认证]
-        E[Gist API 访问]
+    subgraph "配置层"
+        E[sync.enabled 开关]
+        F[GitHub Token 认证]
+        G[Gist API 访问]
     end
     
     subgraph "数据层"
-        F[本地数据 Chrome Storage]
-        G[远程数据 GitHub Gist]
+        H[本地数据 Chrome Storage]
+        I[远程数据 GitHub Gist]
     end
     
-    A --> C
-    B --> A
-    C --> D
     D --> E
-    E --> G
-    A --> F
+    E -->|enabled=true| A
+    D --> A
+    C --> F
+    F --> G
+    G --> I
+    A --> H
     
-    A -.->|冲突检测| H[冲突解决机制]
-    H -.->|用户选择| I[覆盖策略]
+    A -.->|冲突检测| J[冲突解决机制]
+    J -.->|用户选择| K[覆盖策略]
 ```
 
-### 3.2 手动同步流程
+### 3.3 手动同步流程
 
 ```mermaid
 sequenceDiagram
@@ -163,80 +197,79 @@ sequenceDiagram
     
     U->>UI: 点击"同步"按钮
     UI->>SM: 调用 sync() 方法
-    SM->>SM: 设置状态为 'syncing'
-    SM->>GP: 检查认证状态
-    GP->>API: 验证 Token
-    API->>GP: 返回认证结果
+    SM->>SM: 检查 sync.enabled 状态
     
-    alt 认证成功
-        SM->>SM: 获取本地数据
-        SM->>GP: 下载远程数据
-        GP->>API: 获取 Gist 内容
-        API->>GP: 返回远程数据
+    alt sync.enabled = false
+        SM->>UI: 返回 "同步已禁用" 消息
+        UI->>U: 显示同步禁用提示
+    else sync.enabled = true
+        SM->>SM: 设置状态为 'syncing'
+        SM->>GP: 检查认证状态
+        GP->>API: 验证 Token
+        API->>GP: 返回认证结果
         
-        SM->>SM: 检测冲突
-        alt 无冲突
-            SM->>SM: 智能合并数据
-            SM->>SM: 保存本地数据
-            SM->>GP: 上传合并后数据
-            GP->>API: 更新 Gist
-            SM->>UI: 返回同步成功
-        else 有冲突
-            SM->>UI: 返回冲突信息
-            UI->>U: 显示冲突解决对话框
-            U->>UI: 选择解决方案
-            UI->>SM: 调用 resolveConflict()
-            SM->>SM: 应用解决方案
-            SM->>GP: 上传解决后数据
+        alt 认证成功
+            SM->>SM: 获取本地数据
+            SM->>GP: 下载远程数据
+            GP->>API: 获取 Gist 内容
+            API->>GP: 返回远程数据
+            
+            SM->>SM: 检测冲突
+            alt 无冲突
+                SM->>SM: 智能合并数据
+                SM->>SM: 保存本地数据
+                SM->>GP: 上传合并后数据
+                GP->>API: 更新 Gist
+                SM->>UI: 返回同步成功
+            else 有冲突
+                SM->>UI: 返回冲突信息
+                UI->>U: 显示冲突解决对话框
+                U->>UI: 选择解决方案
+                UI->>SM: 调用 resolveConflict()
+                SM->>SM: 应用解决方案
+                SM->>GP: 上传解决后数据
+            end
+        else 认证失败
+            SM->>UI: 返回认证错误
+            UI->>U: 显示认证失败提示
         end
-    else 认证失败
-        SM->>UI: 返回认证错误
-        UI->>U: 显示认证失败提示
     end
 ```
 
-### 3.3 实时同步流程
+### 3.4 实时同步流程
 
 ```mermaid
 sequenceDiagram
     participant BG as Background
-    participant RS as RealtimeSyncManager
     participant SM as SyncManager
     participant GP as GitHubProvider
     
     Note over BG: 用户执行操作（删除分组等）
-    BG->>RS: triggerSync(operation, data)
-    RS->>RS: 检查是否启用实时同步
+    BG->>BG: 检查 sync.enabled 状态
     
-    alt 实时同步已启用
-        RS->>RS: 创建同步任务
-        RS->>RS: 添加到待处理队列
-        RS->>RS: 开始处理任务
+    alt sync.enabled = false
+        BG->>BG: 记录日志：同步已禁用，跳过同步
+    else sync.enabled = true
+        BG->>SM: 异步调用 sync() 方法
+        SM->>SM: 检查认证状态和配置
         
-        loop 处理待处理任务
-            RS->>SM: 调用 sync() 方法
+        alt 认证成功且配置正确
             SM->>GP: 执行同步操作
             
             alt 同步成功
-                RS->>RS: 移除任务
-                RS->>RS: 通知页面同步完成
+                SM->>SM: 更新同步状态
+                Note over SM: 同步完成
             else 同步失败
-                RS->>RS: 增加重试计数
-                alt 未达到最大重试次数
-                    RS->>RS: 延迟后重试
-                else 达到最大重试次数
-                    RS->>RS: 标记任务失败
-                    RS->>RS: 通知页面同步失败
-                end
+                SM->>SM: 记录错误日志
+                Note over SM: 同步失败，等待下次操作重试
             end
+        else 认证失败或配置错误
+            SM->>SM: 记录日志：等待用户配置
         end
-    else 实时同步已禁用
-        RS->>RS: 记录日志：跳过同步
-        Note over RS: 显示 "Realtime sync is disabled"
     end
 ```
 
-### 3.4 冲突检测与解决流程
+### 3.5 冲突检测与解决流程
 
 ```mermaid
 flowchart TD
@@ -320,54 +353,160 @@ flowchart LR
 | 组件 | 职责 | 关键方法 |
 |------|------|----------|
 | **Background Script** | 消息处理、业务逻辑协调 | `aggregateCurrentWindowTabs()`, `deleteGroup()`, `restoreTabs()` |
-| **SyncManager** | 同步逻辑管理、冲突处理 | `sync()`, `detectConflict()`, `resolveConflict()` |
-| **RealtimeSyncManager** | 实时同步任务管理 | `triggerSync()`, `processPendingTasks()` |
+| **SyncIntegration** | 同步系统集成、初始化控制 | `initializeSync()`, `setupPeriodicSync()`, `checkSyncEnabled()` |
+| **SyncManager** | 同步逻辑管理、冲突处理 | `sync()`, `upload()`, `download()`, `enableAutoSync()`, `detectConflict()`, `resolveConflict()` |
+
 | **GitHubSyncProvider** | GitHub API 交互 | `upload()`, `download()`, `isAuthenticated()` |
 | **StorageManager** | 本地数据管理 | `getData()`, `setData()` |
 
 ### 5.2 数据同步策略
 
-1. **实时同步触发条件**：
-   - 创建分组 (`create_group`)
-   - 更新分组 (`update_group`)
-   - 删除分组 (`delete_group`)
-   - 切换锁定状态 (`toggle_group_lock`)
-   - 聚合标签 (`aggregate_tabs`)
+1. **同步启用检查**：
+   - 所有同步操作前都会检查 `sync.enabled` 状态
+   - 系统初始化时检查是否启用同步功能
+   - 定期同步和实时同步都遵循此检查
+   - 禁用时跳过所有同步操作并记录日志
 
-2. **冲突解决策略**：
+2. **实时同步触发**：
+   - 所有数据变更操作后都会检查同步状态
+   - 如果同步启用且配置正确，则异步执行同步
+   - 同步失败不影响用户操作，会在下次操作时重试
+
+3. **冲突解决策略**：
    - 同设备：直接合并
    - 同账号不同设备：检查数据差异
    - 不同账号：提示用户选择
 
-3. **重试机制**：
-   - 最大重试次数：3次
-   - 退避策略：指数退避
-   - 基础延迟：1秒
-   - 最大延迟：30秒
+4. **简化的错误处理**：
+   - 同步失败时记录日志但不阻塞用户操作
+   - 依赖下次操作或定期同步来重试
+   - 用户可以手动触发同步来解决问题
 
 ## 6. 错误处理机制
 
 ```mermaid
 flowchart TD
     A[操作执行] --> B{是否成功}
-    B -->|成功| C[触发实时同步]
+    B -->|成功| C[检查 sync.enabled]
     B -->|失败| D[显示错误信息]
     
-    C --> E{认证状态}
-    E -->|已认证| F[执行同步]
-    E -->|未认证| G[添加到待处理队列]
+    C -->|enabled=false| E[跳过同步]
+    C -->|enabled=true| F[异步执行同步]
     
-    F --> H{同步结果}
-    H -->|成功| I[完成]
-    H -->|失败| J[重试机制]
+    F --> G{认证状态}
+    G -->|已认证| H[执行同步]
+    G -->|未认证| I[记录日志等待配置]
     
-    J --> K{重试次数}
-    K -->|未达上限| L[延迟重试]
-    K -->|达到上限| M[标记失败]
+    H --> J{同步结果}
+    J -->|成功| K[完成]
+    J -->|失败| L[记录错误日志]
     
-    L --> F
-    M --> N[通知用户]
+    L --> M[等待下次操作重试]
+    I --> N[完成]
+    E --> K
+    M --> K
 ```
+
+## 7. 远程同步设计方案详细说明
+
+### 7.1 设计目标
+
+本方案旨在为 UniTab 设计一个健壮、可靠、支持离线操作的多设备数据同步机制。
+
+* **数据一致性:** 确保用户在设备 A、B、C 上的数据，在与远程服务器同步后，能够达到最终一致。
+* **离线优先:** 用户可以随时断开远程连接，在纯本地模式下无缝进行所有操作（增、删、改）。
+* **智能重连:** 当用户重新启用同步时，系统能够智能合并离线期间的本地修改和云端的变更。
+* **冲突解决:** 优雅地处理并发修改导致的冲突，最大限度地避免数据丢失。
+
+### 7.2 核心原则
+
+1. **单一事实来源 (Single Source of Truth):** 当连接时，远程 GitHub Gist 存储的数据被视为最高权威的"主版本"。
+2. **元数据驱动 (Metadata-Driven):** 所有同步决策都基于元数据（最后修改时间、同步开关状态等）。
+3. **乐观锁 & 三路合并:** 沿用此前的核心策略。在写入前检查远程状态，并在冲突时执行三路合并。
+
+### 7.3 数据结构扩展
+
+在 settings 中增加一个关键的布尔值字段 sync.enabled。
+
+```json
+{
+  "version": "1.2.0",
+  "metadata": {
+    "lastModified": "2025-07-15T12:30:00.123Z",
+    "lastSyncTimestamp": "2025-07-15T12:25:00.000Z",
+    "deviceId": "device_unique_id_A"
+  },
+  "settings": {
+    "sync": {
+      "enabled": true, // <-- 核心开关
+      "provider": "github",
+      "gistId": "YOUR_GIST_ID"
+    },
+    "excludeList": [ "localhost" ]
+  },
+  "groups": [ ... ] // 结构不变
+}
+```
+
+### 7.4 同步状态与流程
+
+#### 7.4.1 状态定义
+
+* **在线模式 (Sync Enabled):** settings.sync.enabled 为 true。插件会在启动、本地修改后、定时触发自动同步流程。
+* **离线模式 (Sync Disabled):** settings.sync.enabled 为 false。插件不会执行任何网络请求，所有操作都只影响本地 chrome.storage。
+
+#### 7.4.2 更新后的同步流程图
+
+```mermaid
+graph TD
+    A["同步事件触发<br>(启动、修改、定时、<b>重连</b>)"] --> B{"检查 sync.enabled 状态"};
+    B -- "🔴 禁用 (false)" --> C["不执行任何操作，结束"];
+    B -- "🟢 启用 (true)" --> D{"获取远程元数据<br>(Gist last_updated_at)"};
+
+    D --> E{"比较 远程时间戳<br>与 本地lastSyncTimestamp"};
+    E --> F_NO_CHANGE["时间戳相同<br>✅ 无需操作，结束"];
+    E --> G_REMOTE_NEW["远程版本更新"];
+    E --> H_LOCAL_NEW["仅本地版本更新"];
+
+    G_REMOTE_NEW --> I{"本地有无修改?<br>(local.lastModified > local.lastSyncTimestamp)"};
+    I --> J_PULL["无本地修改<br>🚀 拉取远程数据覆盖本地"];
+    I --> K_CONFLICT["有本地修改<br>🚨 检测到冲突!"];
+
+    H_LOCAL_NEW --> L_PUSH["🚀 推送本地数据至远程"];
+    L_PUSH --> M["成功后，更新本地<br>lastSyncTimestamp"];
+
+    K_CONFLICT --> N{"执行三路合并算法"};
+    N -- "合并成功" --> L_PUSH;
+    N -- "需要用户介入" --> O["UI提示用户选择<br><b>(保留本地/保留远程/智能合并)</b>"];
+
+    J_PULL --> M;
+    M --> P["✅ 同步完成"];
+```
+
+#### 7.4.3 关键场景处理
+
+1. **断开同步 (用户操作):**
+   * 用户在选项页关闭同步开关。
+   * 插件将 settings.sync.enabled 设置为 false。
+   * 所有正在进行的或计划中的同步任务都将取消。
+   * 此时 lastSyncTimestamp 将被"冻结"，成为未来恢复同步时的重要基准。
+
+2. **离线期间操作:**
+   * 用户正常进行增、删、改分组和标签页。
+   * 每次修改都会更新 metadata.lastModified 时间戳，但 lastSyncTimestamp 保持不变。
+
+3. **重新连接同步 (用户操作):**
+   * 用户在选项页重新打开同步开关。
+   * 这会立即触发一次手动的、高优先级的 **"同步事件"**。
+   * 流程启动，进入流程图的 A 点。
+   * 系统会发现 remote_timestamp (来自 Gist) 和 local.lastModified 都可能大于被"冻结"的 lastSyncTimestamp，这会大概率导向 K_CONFLICT (冲突检测)。
+   * **冲突处理:**
+     * 系统执行 **三路合并** 算法。
+     * **如果可以自动合并** (例如，云端新增了一个分组，本地修改了另一个分组的名称)，则自动完成并推送。
+     * **如果发生复杂冲突** (例如，云端和本地都修改了同一个分组的名称)，则必须由用户介入。插件将弹出一个模态框，提供清晰的选项：
+       * **保留云端版本**: 放弃所有本地离线修改，用云端数据完全覆盖本地。
+       * **保留本地版本**: 用本地数据覆盖云端版本，这可能会导致其他设备的修改丢失。
+       * 尝试智能合并: (默认推荐) 执行三路合并算法，并展示合并预览（如果可行）。
 
 ---
 

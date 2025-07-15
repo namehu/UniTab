@@ -1,19 +1,9 @@
 import React, { useState, useEffect } from "react";
+import type { TabData, TabGroup } from '../types/background';
 
-// 定义分组和标签的类型
-interface Tab {
-  id: number;
-  url: string;
-  title: string;
-  favIconUrl?: string;
-}
-
-interface Group {
-  id: string;
-  name: string;
-  tabs: Tab[];
-  createdAt: string;
-}
+// 类型别名以保持兼容性
+type Tab = TabData & { id: number };
+type Group = Omit<TabGroup, 'id' | 'pinned' | 'locked'> & { id: string; };
 
 const App: React.FC = () => {
   const [recentGroups, setRecentGroups] = useState<Group[]>([]);
@@ -39,19 +29,25 @@ const App: React.FC = () => {
   }, []);
 
   const handleAggregate = async () => {
+    console.log("handleAggregate called"); // 调试信息
     setLoading(true);
     try {
+      console.log("Sending aggregateTabs message"); // 调试信息
       const response = await chrome.runtime.sendMessage({
         action: "aggregateTabs",
       });
+      console.log("Response received:", response); // 调试信息
       if (response.success) {
+        console.log("Aggregation successful, closing window"); // 调试信息
         // 可以添加一个提示，但由于窗口会关闭，可能看不到
         setTimeout(() => window.close(), 500);
       } else {
         console.error("Aggregation failed:", response.error);
+        alert(`聚合失败: ${response.error}`); // 添加用户可见的错误提示
       }
     } catch (error) {
       console.error("Error aggregating tabs:", error);
+      alert(`聚合出错: ${error}`); // 添加用户可见的错误提示
     } finally {
       setLoading(false);
     }

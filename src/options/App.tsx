@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { SyncSettings } from "../tab_list/components/SyncSettings";
 
 // 类型定义
 interface Settings {
@@ -394,6 +395,8 @@ const DataManagement: React.FC = () => {
     tabCount: 0,
     lockedGroups: 0,
   });
+  const [syncEnabled, setSyncEnabled] = useState(false);
+  const [showSyncSettings, setShowSyncSettings] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -404,6 +407,13 @@ const DataManagement: React.FC = () => {
           setStats(response.data);
         }
       });
+    
+    // 获取同步设置状态
+    chrome.storage.local.get(["settings"], (result) => {
+      if (result.settings?.sync?.enabled) {
+        setSyncEnabled(result.settings.sync.enabled);
+      }
+    });
   }, []);
 
   const handleExport = (format: "json" | "csv") => {
@@ -454,8 +464,44 @@ const DataManagement: React.FC = () => {
     }
   };
 
+  const handleSyncEnabledChange = (enabled: boolean) => {
+    setSyncEnabled(enabled);
+    chrome.storage.local.get(["settings"], (result) => {
+      const settings = result.settings || {};
+      const newSettings = {
+        ...settings,
+        sync: {
+          ...settings.sync,
+          enabled: enabled
+        }
+      };
+      chrome.storage.local.set({ settings: newSettings });
+    });
+  };
+
   return (
     <div>
+      <SettingsCard title="数据同步" description="管理您的数据同步设置。">
+        <div className="space-y-4">
+          <label className="flex items-center">
+            <input
+              type="checkbox"
+              className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+              checked={syncEnabled}
+              onChange={(e) => handleSyncEnabledChange(e.target.checked)}
+            />
+            <span className="ml-2 text-sm text-gray-700">启用数据同步</span>
+          </label>
+          {syncEnabled && (
+            <button
+              onClick={() => setShowSyncSettings(true)}
+              className="btn btn-secondary"
+            >
+              配置同步设置
+            </button>
+          )}
+        </div>
+      </SettingsCard>
       <SettingsCard title="统计信息">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="bg-blue-50 p-4 rounded-lg">

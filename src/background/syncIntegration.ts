@@ -4,7 +4,6 @@
  */
 
 import { syncManager } from '../utils/sync/SyncManager';
-import { realtimeSyncManager } from '../utils/sync/RealtimeSyncManager';
 import type { SyncStatus } from '../types/sync';
 
 /**
@@ -12,17 +11,26 @@ import type { SyncStatus } from '../types/sync';
  */
 export async function initializeSync(): Promise<void> {
   try {
+    // 检查同步是否启用
+    const syncEnabled = await checkSyncEnabled();
+    if (!syncEnabled) {
+      console.log('Sync is disabled in settings, skipping sync system initialization');
+      return;
+    }
+
     // 监听同步状态变化
     syncManager.onStatusChange((status: SyncStatus) => {
       console.log('Sync status changed:', status);
-      
+
       // 可以在这里发送消息给其他页面通知状态变化
-      chrome.runtime.sendMessage({
-        type: 'SYNC_STATUS_CHANGED',
-        status
-      }).catch(() => {
-        // 忽略没有监听器的错误
-      });
+      chrome.runtime
+        .sendMessage({
+          type: 'SYNC_STATUS_CHANGED',
+          status
+        })
+        .catch(() => {
+          // 忽略没有监听器的错误
+        });
     });
 
     // 如果启用了自动同步，则启动自动同步
@@ -30,18 +38,6 @@ export async function initializeSync(): Promise<void> {
     if (config.autoSync) {
       syncManager.enableAutoSync();
       console.log('Auto sync enabled with interval:', config.syncInterval, 'minutes');
-    }
-    
-    // 实时同步独立于自动同步，只要有认证就启用
-    try {
-      await realtimeSyncManager.enable();
-      if (realtimeSyncManager.isRealtimeSyncEnabled()) {
-        console.log('Realtime sync enabled');
-      } else {
-        console.log('Realtime sync not enabled - authentication required');
-      }
-    } catch (error) {
-      console.log('Failed to enable realtime sync:', error);
     }
 
     console.log('Sync system initialized successfully');
@@ -53,7 +49,11 @@ export async function initializeSync(): Promise<void> {
 /**
  * 处理来自其他页面的同步相关消息
  */
-export function handleSyncMessages(request: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void): boolean {
+export function handleSyncMessages(
+  request: any,
+  sender: chrome.runtime.MessageSender,
+  sendResponse: (response?: any) => void
+): boolean {
   switch (request.action) {
     case 'sync':
       handleSyncRequest(sendResponse);
@@ -82,22 +82,13 @@ export function handleSyncMessages(request: any, sender: chrome.runtime.MessageS
     case 'getRealtimeSyncStatus':
       sendResponse({
         success: true,
-        enabled: realtimeSyncManager.isRealtimeSyncEnabled(),
-        pendingTasks: realtimeSyncManager.getPendingTaskCount()
+        enabled: true, // 实时同步现在总是启用的（集成在操作中）
+        pendingTasks: 0 // 不再有待处理任务队列
       });
       return false;
 
-    case 'enableRealtimeSync':
-      handleEnableRealtimeSyncRequest(sendResponse);
-      return true;
-
-    case 'disableRealtimeSync':
-      realtimeSyncManager.disable();
-      sendResponse({ success: true });
-      return false;
-
     case 'forceSync':
-      handleForceSyncRequest(sendResponse);
+      handleSyncRequest(sendResponse); // 直接使用同步请求处理
       return true;
 
     default:
@@ -106,10 +97,31 @@ export function handleSyncMessages(request: any, sender: chrome.runtime.MessageS
 }
 
 /**
+ * 检查同步是否启用
+ */
+async function checkSyncEnabled(): Promise<boolean> {
+  return new Promise((resolve) => {
+    chrome.storage.local.get(['settings'], (result) => {
+      const syncEnabled = result.settings?.sync?.enabled || false;
+      resolve(syncEnabled);
+    });
+  });
+}
+
+/**
  * 处理同步请求
  */
 async function handleSyncRequest(sendResponse: (response: any) => void): Promise<void> {
   try {
+    const syncEnabled = await checkSyncEnabled();
+    if (!syncEnabled) {
+      sendResponse({
+        success: false,
+        error: 'Sync is disabled in settings'
+      });
+      return;
+    }
+
     const result = await syncManager.sync();
     sendResponse({
       success: result.success,
@@ -129,6 +141,15 @@ async function handleSyncRequest(sendResponse: (response: any) => void): Promise
  */
 async function handleUploadRequest(sendResponse: (response: any) => void): Promise<void> {
   try {
+    const syncEnabled = await checkSyncEnabled();
+    if (!syncEnabled) {
+      sendResponse({
+        success: false,
+        error: 'Sync is disabled in settings'
+      });
+      return;
+    }
+
     const result = await syncManager.upload();
     sendResponse({
       success: result.success,
@@ -148,6 +169,15 @@ async function handleUploadRequest(sendResponse: (response: any) => void): Promi
  */
 async function handleDownloadRequest(sendResponse: (response: any) => void): Promise<void> {
   try {
+    const syncEnabled = await checkSyncEnabled();
+    if (!syncEnabled) {
+      sendResponse({
+        success: false,
+        error: 'Sync is disabled in settings'
+      });
+      return;
+    }
+
     const result = await syncManager.download();
     sendResponse({
       success: result.success,
@@ -168,14 +198,9 @@ async function handleDownloadRequest(sendResponse: (response: any) => void): Pro
 async function handleSetConfigRequest(config: any, sendResponse: (response: any) => void): Promise<void> {
   try {
     await syncManager.setConfig(config);
-    
-    // 实时同步独立于自动同步配置，只要有认证就尝试启用
-    try {
-      await realtimeSyncManager.enable();
-    } catch (error) {
-      console.log('Failed to enable realtime sync after config update:', error);
-    }
-    
+
+    // 实时同步现在集成在操作流程中，无需单独启用
+
     sendResponse({
       success: true,
       config: syncManager.config
@@ -189,48 +214,17 @@ async function handleSetConfigRequest(config: any, sendResponse: (response: any)
 }
 
 /**
- * 处理启用实时同步请求
- */
-async function handleEnableRealtimeSyncRequest(sendResponse: (response: any) => void): Promise<void> {
-  try {
-    await realtimeSyncManager.enable();
-    sendResponse({
-      success: true
-    });
-  } catch (error) {
-    sendResponse({
-      success: false,
-      error: error instanceof Error ? error.message : 'Enable realtime sync failed'
-    });
-  }
-}
-
-/**
- * 处理强制同步请求
- */
-async function handleForceSyncRequest(sendResponse: (response: any) => void): Promise<void> {
-  try {
-    const result = await realtimeSyncManager.forceSync();
-    sendResponse({
-      success: result.success,
-      error: result.error,
-      timestamp: result.timestamp
-    });
-  } catch (error) {
-    sendResponse({
-      success: false,
-      error: error instanceof Error ? error.message : 'Force sync failed'
-    });
-  }
-}
-
-/**
  * 定期检查并执行同步（可选的额外保障）
  */
 export function setupPeriodicSync(): void {
   // 每小时检查一次是否需要同步
   setInterval(async () => {
     try {
+      const syncEnabled = await checkSyncEnabled();
+      if (!syncEnabled) {
+        return;
+      }
+
       const config = syncManager.config;
       if (!config.autoSync || !config.lastSync) {
         return;
@@ -256,6 +250,12 @@ export function setupPeriodicSync(): void {
  */
 export async function performStartupSync(): Promise<void> {
   try {
+    const syncEnabled = await checkSyncEnabled();
+    if (!syncEnabled) {
+      console.log('Sync is disabled, skipping startup sync');
+      return;
+    }
+
     const config = syncManager.config;
     if (!config.autoSync) {
       return;

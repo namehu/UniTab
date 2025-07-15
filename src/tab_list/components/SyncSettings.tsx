@@ -32,6 +32,7 @@ export const SyncSettings: React.FC<SyncSettingsProps> = ({ isOpen, onClose }) =
   const [lastSyncTime, setLastSyncTime] = useState<string>('')
   const [githubToken, setGithubToken] = useState('')
   const [showTokenInput, setShowTokenInput] = useState(false)
+  const [syncEnabled, setSyncEnabled] = useState(false)
 
   // 监听同步状态变化
   useEffect(() => {
@@ -43,6 +44,13 @@ export const SyncSettings: React.FC<SyncSettingsProps> = ({ isOpen, onClose }) =
 
     // 初始化认证状态
     checkAuthStatus()
+    
+    // 获取sync.enabled状态
+    chrome.storage.local.get(['settings'], (result) => {
+      if (result.settings?.sync?.enabled) {
+        setSyncEnabled(result.settings.sync.enabled)
+      }
+    })
 
     return () => {
       // 清理监听器（实际实现中可能需要提供取消监听的方法）
@@ -82,6 +90,22 @@ export const SyncSettings: React.FC<SyncSettingsProps> = ({ isOpen, onClose }) =
     const newConfig = { ...config, autoSync }
     setConfig(newConfig)
     await syncManager.setConfig(newConfig)
+  }
+  
+  // 处理sync.enabled设置
+  const handleSyncEnabledChange = (enabled: boolean) => {
+    setSyncEnabled(enabled)
+    chrome.storage.local.get(['settings'], (result) => {
+      const settings = result.settings || {}
+      const newSettings = {
+        ...settings,
+        sync: {
+          ...settings.sync,
+          enabled: enabled
+        }
+      }
+      chrome.storage.local.set({ settings: newSettings })
+    })
   }
 
   // 处理同步间隔变更
@@ -322,6 +346,28 @@ export const SyncSettings: React.FC<SyncSettingsProps> = ({ isOpen, onClose }) =
               📋 同步功能将保存您的所有标签页分组数据和应用设置到云端，确保在不同设备间保持一致的使用体验。
             </p>
           </div>
+          
+          {/* 同步总开关 */}
+          <div>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={syncEnabled}
+                onChange={(e) => handleSyncEnabledChange(e.target.checked)}
+                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <span className="text-sm font-medium text-gray-700">启用数据同步</span>
+            </label>
+            <p className="text-xs text-gray-500 mt-1">关闭此选项将完全禁用同步功能</p>
+          </div>
+          
+          {!syncEnabled && (
+            <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <p className="text-sm text-yellow-800">
+                ⚠️ 数据同步已禁用。启用同步功能以配置其他选项。
+              </p>
+            </div>
+          )}
 
           {/* 同步状态 */}
           <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
@@ -335,23 +381,25 @@ export const SyncSettings: React.FC<SyncSettingsProps> = ({ isOpen, onClose }) =
           </div>
 
           {/* 同步提供商选择 */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">同步提供商</label>
-            <select
-              value={config.provider}
-              onChange={(e) => handleProviderChange(e.target.value as SyncProvider)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              {SyncProviderFactory.getSupportedProviders().map((provider) => (
-                <option key={provider} value={provider}>
-                  {provider === 'github' ? 'GitHub Gist' : provider}
-                </option>
-              ))}
-            </select>
-          </div>
+          {syncEnabled && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">同步提供商</label>
+              <select
+                value={config.provider}
+                onChange={(e) => handleProviderChange(e.target.value as SyncProvider)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {SyncProviderFactory.getSupportedProviders().map((provider) => (
+                  <option key={provider} value={provider}>
+                    {provider === 'github' ? 'GitHub Gist' : provider}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* GitHub 认证 */}
-          {config.provider === 'github' && (
+          {syncEnabled && config.provider === 'github' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">GitHub 认证</label>
               <div className="space-y-2">
@@ -428,20 +476,22 @@ export const SyncSettings: React.FC<SyncSettingsProps> = ({ isOpen, onClose }) =
           )}
 
           {/* 自动同步设置 */}
-          <div>
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={config.autoSync}
-                onChange={(e) => handleAutoSyncChange(e.target.checked)}
-                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-              />
-              <span className="text-sm font-medium text-gray-700">启用自动同步</span>
-            </label>
-          </div>
+          {syncEnabled && (
+            <div>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={config.autoSync}
+                  onChange={(e) => handleAutoSyncChange(e.target.checked)}
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <span className="text-sm font-medium text-gray-700">启用自动同步</span>
+              </label>
+            </div>
+          )}
 
           {/* 同步间隔设置 */}
-          {config.autoSync && (
+          {syncEnabled && config.autoSync && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">同步间隔（分钟）</label>
               <select
@@ -459,7 +509,7 @@ export const SyncSettings: React.FC<SyncSettingsProps> = ({ isOpen, onClose }) =
           )}
 
           {/* 手动操作按钮 */}
-          {isAuthenticated && (
+          {syncEnabled && isAuthenticated && (
             <div className="space-y-2">
               <h3 className="text-sm font-medium text-gray-700">手动操作</h3>
               <div className="grid grid-cols-3 gap-2">

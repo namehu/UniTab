@@ -83,19 +83,10 @@ export class GitHubSyncProvider implements ISyncProvider {
    */
   async authenticate(): Promise<boolean> {
     try {
-      // 由于GitHub OAuth需要客户端密钥，这里提供一个简化的实现
-      // 实际使用中，建议用户手动创建Personal Access Token
-
       // 打开GitHub Personal Access Token创建页面
       const tokenUrl = 'https://github.com/settings/tokens/new?scopes=gist&description=UniTab%20Browser%20Extension';
-
-      // 在新标签页中打开
       await chrome.tabs.create({ url: tokenUrl });
-
-      // 提示用户手动输入token
-      alert('请在打开的GitHub页面创建Personal Access Token，然后在设置中手动输入该Token。\n\n需要的权限：gist');
-
-      return false; // 返回false，让用户手动输入token
+      return false; // 用户需要手动输入token
     } catch (error) {
       console.error('GitHub authentication failed:', error);
       return false;
@@ -140,8 +131,7 @@ export class GitHubSyncProvider implements ISyncProvider {
           headers: {
             Authorization: `Bearer ${this.config.token}`,
             Accept: 'application/vnd.github.v3+json',
-            'Content-Type': 'application/json',
-            'User-Agent': 'UniTab-Extension'
+            'Content-Type': 'application/json'
           },
           body: JSON.stringify(gistData)
         });
@@ -154,8 +144,7 @@ export class GitHubSyncProvider implements ISyncProvider {
           headers: {
             Authorization: `Bearer ${this.config.token}`,
             Accept: 'application/vnd.github.v3+json',
-            'Content-Type': 'application/json',
-            'User-Agent': 'UniTab-Extension'
+            'Content-Type': 'application/json'
           },
           body: JSON.stringify(gistData)
         });
