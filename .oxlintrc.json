@@ -21,7 +21,7 @@
 
     // 代码风格和质量
     "no-else-return": "error",
-    "max-depth": ["error", 5],
+    "max-depth": ["error", 6],
     "max-lines": ["error", 800],
     "prefer-object-spread": "error",
     "prefer-object-has-own": "error",

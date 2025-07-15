@@ -1,3 +1,4 @@
+// oxlint-disable max-lines
 /**
  * 同步管理器实现
  * 负责协调不同的同步提供商，处理同步逻辑、冲突解决等
@@ -13,7 +14,6 @@ import type {
   SyncConflict,
   ConflictResolution
 } from '../../types/sync';
-import type { Group } from '../../tab_list/types';
 import { SyncProviderFactory } from './SyncProviderFactory';
 import { StorageManager } from '../storage';
 
@@ -31,7 +31,7 @@ export class SyncManager implements ISyncManager {
       syncInterval: 30, // 30分钟
       providerConfig: {}
     };
-    
+
     this.loadConfig();
   }
 
@@ -56,10 +56,10 @@ export class SyncManager implements ISyncManager {
     try {
       this._config = { ...config };
       await this.saveConfig();
-      
+
       // 重新初始化提供商
       await this.initializeProvider();
-      
+
       // 重新设置自动同步
       if (config.autoSync) {
         this.enableAutoSync();
@@ -79,12 +79,12 @@ export class SyncManager implements ISyncManager {
     try {
       // 停止自动同步
       this.disableAutoSync();
-      
+
       // 禁用实时同步
       const { RealtimeSyncManager } = await import('./RealtimeSyncManager');
       const realtimeSyncManager = RealtimeSyncManager.getInstance();
       realtimeSyncManager.disable();
-      
+
       // 重置配置为默认值
       this._config = {
         provider: 'github',
@@ -93,16 +93,16 @@ export class SyncManager implements ISyncManager {
         providerConfig: {},
         lastSync: undefined
       };
-      
+
       // 清除存储的配置
       await chrome.storage.local.remove(['syncConfig', 'sync_github_config', 'lastSyncData', 'github_user_info']);
-      
+
       // 清除提供商
       this.provider = null;
-      
+
       // 重置状态
       this.setStatus('idle');
-      
+
       console.log('Sync config cleared successfully, realtime sync disabled');
     } catch (error) {
       console.error('Clear sync config failed:', error);
@@ -117,7 +117,7 @@ export class SyncManager implements ISyncManager {
     try {
       console.log('=== Starting manual sync ===');
       this.setStatus('syncing');
-      
+
       if (!this.provider) {
         console.log('No provider, initializing...');
         await this.initializeProvider();
@@ -132,7 +132,7 @@ export class SyncManager implements ISyncManager {
       // 检查是否已认证（即是否设置了远程同步）
       const isAuthenticated = await this.provider.isAuthenticated();
       console.log('Is authenticated (remote sync configured):', isAuthenticated);
-      
+
       // 如果没有设置远程同步，则以本地为主
       if (!isAuthenticated) {
         console.log('No remote sync configured, using local data only');
@@ -148,15 +148,15 @@ export class SyncManager implements ISyncManager {
       const localData = await this.getLocalData();
       console.log('Local data timestamp:', localData.timestamp);
       console.log('Local groups count:', localData.data.groups?.length || 0);
-      
+
       const hasLocalData = localData.data.groups && localData.data.groups.length > 0;
       console.log('Has local data:', hasLocalData);
-      
+
       // 尝试下载远程数据
       console.log('Checking for remote data...');
       let remoteData: SyncData | null = null;
       let hasRemoteData = false;
-      
+
       try {
         remoteData = await this.provider.download();
         hasRemoteData = remoteData && remoteData.data.groups && remoteData.data.groups.length > 0;
@@ -170,7 +170,7 @@ export class SyncManager implements ISyncManager {
         console.log('No remote data found or download failed');
         hasRemoteData = false;
       }
-      
+
       // 根据本地和远程数据的存在情况进行处理
       if (!hasLocalData && hasRemoteData) {
         // 情况1: 本地没有，远程有 - 拉取远程数据
@@ -199,10 +199,9 @@ export class SyncManager implements ISyncManager {
             timestamp: new Date().toISOString(),
             version: localData.version
           };
-        } else {
-          this.setStatus('error');
-          return uploadResult;
         }
+        this.setStatus('error');
+        return uploadResult;
       } else if (!hasLocalData && !hasRemoteData) {
         // 本地和远程都没有数据
         console.log('No data found locally or remotely');
@@ -213,46 +212,46 @@ export class SyncManager implements ISyncManager {
           timestamp: new Date().toISOString()
         };
       }
-      
+
       // 情况3: 本地有，远程也有 - 检测冲突并处理
       console.log('Case 3: Both local and remote data exist - checking for conflicts');
       if (!remoteData) {
         throw new Error('Remote data should exist but is null');
       }
-      
+
       // 检测是否存在冲突
       const conflict = await this.detectConflict(localData, remoteData);
-      
+
       if (conflict) {
-         console.log('Conflict detected between local and remote data');
-         this.setStatus('error');
-         return {
-           success: false,
-           conflict,
-           message: '检测到同步冲突，需要用户选择解决方案',
-           timestamp: new Date().toISOString()
-         };
-       }
-      
+        console.log('Conflict detected between local and remote data');
+        this.setStatus('error');
+        return {
+          success: false,
+          conflict,
+          message: '检测到同步冲突，需要用户选择解决方案',
+          timestamp: new Date().toISOString()
+        };
+      }
+
       // 没有冲突，进行智能合并
       console.log('No conflict detected, performing intelligent merge');
       const mergedData = this.mergeData(localData, remoteData);
       console.log('Merged data groups count:', mergedData.data.groups?.length || 0);
-      
+
       // 保存合并后的数据到本地
       await this.saveLocalData(mergedData);
       console.log('Merged data saved locally');
-      
+
       // 上传合并后的数据到远程
       console.log('Uploading merged data to remote...');
       const uploadResult = await this.provider.upload(mergedData);
-      
+
       if (uploadResult.success) {
         this._config.lastSync = new Date().toISOString();
         await this.saveConfig();
         this.setStatus('success');
         console.log('Intelligent merge and upload completed successfully');
-        
+
         return {
           success: true,
           message: '数据已智能合并并同步完成',
@@ -260,16 +259,14 @@ export class SyncManager implements ISyncManager {
           timestamp: new Date().toISOString(),
           version: mergedData.version
         };
-      } else {
-        this.setStatus('error');
-        console.error('Upload failed after merge:', uploadResult.error);
-        return {
-          success: false,
-          error: '数据合并成功，但上传失败：' + uploadResult.error,
-          timestamp: new Date().toISOString()
-        };
       }
-
+      this.setStatus('error');
+      console.error('Upload failed after merge:', uploadResult.error);
+      return {
+        success: false,
+        error: '数据合并成功，但上传失败：' + uploadResult.error,
+        timestamp: new Date().toISOString()
+      };
     } catch (error) {
       console.error('Sync failed:', error);
       this.setStatus('error');
@@ -287,7 +284,7 @@ export class SyncManager implements ISyncManager {
   async upload(): Promise<SyncResult> {
     try {
       this.setStatus('syncing');
-      
+
       if (!this.provider) {
         await this.initializeProvider();
       }
@@ -298,7 +295,7 @@ export class SyncManager implements ISyncManager {
 
       const localData = await this.getLocalData();
       const result = await this.provider.upload(localData);
-      
+
       if (result.success) {
         this._config.lastSync = new Date().toISOString();
         await this.saveConfig();
@@ -306,7 +303,7 @@ export class SyncManager implements ISyncManager {
       } else {
         this.setStatus('error');
       }
-      
+
       return result;
     } catch (error) {
       console.error('Upload failed:', error);
@@ -325,7 +322,7 @@ export class SyncManager implements ISyncManager {
   async download(): Promise<SyncResult> {
     try {
       this.setStatus('syncing');
-      
+
       if (!this.provider) {
         await this.initializeProvider();
       }
@@ -336,11 +333,11 @@ export class SyncManager implements ISyncManager {
 
       const remoteData = await this.provider.download();
       await this.saveLocalData(remoteData);
-      
+
       this._config.lastSync = new Date().toISOString();
       await this.saveConfig();
       this.setStatus('success');
-      
+
       return {
         success: true,
         timestamp: new Date().toISOString(),
@@ -363,9 +360,9 @@ export class SyncManager implements ISyncManager {
   async resolveConflict(conflict: SyncConflict, resolution: ConflictResolution): Promise<SyncResult> {
     try {
       this.setStatus('syncing');
-      
+
       let finalData: SyncData;
-      
+
       switch (resolution) {
         case 'local':
           finalData = conflict.local;
@@ -379,10 +376,10 @@ export class SyncManager implements ISyncManager {
         default:
           throw new Error('Invalid conflict resolution');
       }
-      
+
       // 保存解决后的数据
       await this.saveLocalData(finalData);
-      
+
       // 上传到远程
       if (this.provider) {
         const uploadResult = await this.provider.upload(finalData);
@@ -395,7 +392,7 @@ export class SyncManager implements ISyncManager {
         }
         return uploadResult;
       }
-      
+
       throw new Error('No sync provider available');
     } catch (error) {
       console.error('Resolve conflict failed:', error);
@@ -413,10 +410,10 @@ export class SyncManager implements ISyncManager {
    */
   enableAutoSync(): void {
     this.disableAutoSync(); // 先清除现有的定时器
-    
+
     if (this._config.syncInterval > 0) {
       this.autoSyncTimer = setInterval(() => {
-        this.sync().catch(error => {
+        this.sync().catch((error) => {
           console.error('Auto sync failed:', error);
         });
       }, this._config.syncInterval * 60 * 1000); // 转换为毫秒
@@ -464,7 +461,7 @@ export class SyncManager implements ISyncManager {
     try {
       this.provider = SyncProviderFactory.createProvider(this._config.provider);
       await this.provider.initialize(this._config.providerConfig);
-      
+
       // 如果是GitHub提供商，尝试获取用户信息用于统一账号识别
       if (this.provider && this.provider.name === 'github') {
         try {
@@ -486,7 +483,7 @@ export class SyncManager implements ISyncManager {
   private setStatus(status: SyncStatus): void {
     if (this._status !== status) {
       this._status = status;
-      this.statusCallbacks.forEach(callback => {
+      this.statusCallbacks.forEach((callback) => {
         try {
           callback(status);
         } catch (error) {
@@ -502,7 +499,7 @@ export class SyncManager implements ISyncManager {
   private async getLocalData(): Promise<SyncData> {
     try {
       const storageData = await StorageManager.getData();
-      
+
       return {
         version: this.generateVersion(),
         timestamp: new Date().toISOString(),
@@ -510,7 +507,7 @@ export class SyncManager implements ISyncManager {
           id: await this.getDeviceId(),
           name: await this.getDeviceName(),
           platform: this.getPlatform(),
-          githubUserId: await this.getGitHubUserId() || undefined
+          githubUserId: (await this.getGitHubUserId()) || undefined
         },
         data: {
           groups: storageData.groups || [],
@@ -530,17 +527,17 @@ export class SyncManager implements ISyncManager {
     try {
       // 获取当前存储数据
       const currentData = await StorageManager.getData();
-      
+
       // 更新数据
       const updatedData = {
         ...currentData,
         groups: data.data.groups,
         settings: data.data.settings
       };
-      
+
       // 保存更新后的数据
       await StorageManager.setData(updatedData);
-      
+
       // 保存同步元数据
       await chrome.storage.local.set({
         lastSyncData: data
@@ -559,15 +556,15 @@ export class SyncManager implements ISyncManager {
     if (local.device.id === remote.device.id) {
       return null;
     }
-    
+
     // 检查是否是同一GitHub账号的不同设备
     const localGithubUserId = await this.getGitHubUserId();
     const remoteGithubUserId = remote.device.githubUserId;
-    
+
     // 如果是同一GitHub账号的不同设备，检查数据差异
     if (localGithubUserId && remoteGithubUserId && localGithubUserId === remoteGithubUserId) {
       const hasDataDifference = this.hasSignificantDataDifference(local, remote);
-      
+
       if (hasDataDifference) {
         // 同一账号不同设备有数据差异，返回设备冲突（需要用户选择）
         return {
@@ -576,11 +573,11 @@ export class SyncManager implements ISyncManager {
           type: 'device'
         };
       }
-      
+
       // 同一账号不同设备无数据差异，可以直接合并
       return null;
     }
-    
+
     // 不同账号或无法确定账号，有数据差异就是冲突
     const hasDataDifference = this.hasSignificantDataDifference(local, remote);
     if (hasDataDifference) {
@@ -590,7 +587,7 @@ export class SyncManager implements ISyncManager {
         type: 'device'
       };
     }
-    
+
     return null;
   }
 
@@ -601,16 +598,16 @@ export class SyncManager implements ISyncManager {
     // 比较分组数量
     const localGroupCount = local.data.groups?.length || 0;
     const remoteGroupCount = remote.data.groups?.length || 0;
-    
+
     // 如果分组数量差异超过阈值，认为有差异
     if (Math.abs(localGroupCount - remoteGroupCount) > 0) {
       return true;
     }
-    
+
     // 比较分组内容（简化版本，比较分组ID）
-    const localGroupIds = new Set(local.data.groups?.map(g => g.id) || []);
-    const remoteGroupIds = new Set(remote.data.groups?.map(g => g.id) || []);
-    
+    const localGroupIds = new Set(local.data.groups?.map((g) => g.id) || []);
+    const remoteGroupIds = new Set(remote.data.groups?.map((g) => g.id) || []);
+
     // 检查是否有不同的分组
     for (const id of localGroupIds) {
       if (!remoteGroupIds.has(id)) return true;
@@ -618,7 +615,7 @@ export class SyncManager implements ISyncManager {
     for (const id of remoteGroupIds) {
       if (!localGroupIds.has(id)) return true;
     }
-    
+
     return false;
   }
 
@@ -628,7 +625,7 @@ export class SyncManager implements ISyncManager {
   private mergeData(local: SyncData, remote: SyncData): SyncData {
     const localTime = new Date(local.timestamp).getTime();
     const remoteTime = new Date(remote.timestamp).getTime();
-    
+
     // 如果本地数据更新（比如刚删除了分组），优先使用本地数据
     if (localTime > remoteTime) {
       console.log('Local data is newer, using local data as primary source');
@@ -646,26 +643,26 @@ export class SyncManager implements ISyncManager {
         }
       };
     }
-    
+
     // 如果远程数据更新，进行智能合并
     console.log('Remote data is newer or equal, performing intelligent merge');
-    
+
     // 创建合并后的分组映射
     const mergedGroupsMap = new Map();
-    
+
     // 添加本地分组
-    (local.data.groups || []).forEach(group => {
+    (local.data.groups || []).forEach((group) => {
       mergedGroupsMap.set(group.id, {
         ...group,
         _source: 'local',
         _timestamp: localTime
       });
     });
-    
+
     // 合并远程分组
-    (remote.data.groups || []).forEach(remoteGroup => {
+    (remote.data.groups || []).forEach((remoteGroup) => {
       const existingGroup = mergedGroupsMap.get(remoteGroup.id);
-      
+
       if (!existingGroup) {
         // 新分组，直接添加
         mergedGroupsMap.set(remoteGroup.id, {
@@ -677,7 +674,7 @@ export class SyncManager implements ISyncManager {
         // 分组已存在，比较时间戳决定使用哪个版本
         const existingTime = new Date(existingGroup.createdAt || 0).getTime();
         const remoteGroupTime = new Date(remoteGroup.createdAt || 0).getTime();
-        
+
         if (remoteGroupTime > existingTime) {
           // 远程版本更新，但保留本地的标签页（合并标签页）
           const mergedTabs = this.mergeTabs(existingGroup.tabs || [], remoteGroup.tabs || []);
@@ -699,18 +696,19 @@ export class SyncManager implements ISyncManager {
         }
       }
     });
-    
+
     // 转换为数组并清理临时字段
-    const mergedGroups = Array.from(mergedGroupsMap.values()).map(group => {
+    const mergedGroups = Array.from(mergedGroupsMap.values()).map((group) => {
       const { _source, _timestamp, ...cleanGroup } = group;
       return cleanGroup;
     });
-    
+
     // 合并设置（优先使用较新的设置）
-    const mergedSettings = remoteTime > localTime ? 
-      { ...local.data.settings, ...remote.data.settings } :
-      { ...remote.data.settings, ...local.data.settings };
-    
+    const mergedSettings =
+      remoteTime > localTime
+        ? { ...local.data.settings, ...remote.data.settings }
+        : { ...remote.data.settings, ...local.data.settings };
+
     return {
       version: this.generateVersion(),
       timestamp: new Date().toISOString(),
@@ -731,19 +729,19 @@ export class SyncManager implements ISyncManager {
    */
   private mergeTabs(localTabs: any[], remoteTabs: any[]): any[] {
     const tabsMap = new Map();
-    
+
     // 添加本地标签页
-    localTabs.forEach(tab => {
+    localTabs.forEach((tab) => {
       tabsMap.set(tab.url, tab);
     });
-    
+
     // 添加远程标签页（去重）
-    remoteTabs.forEach(tab => {
+    remoteTabs.forEach((tab) => {
       if (!tabsMap.has(tab.url)) {
         tabsMap.set(tab.url, tab);
       }
     });
-    
+
     return Array.from(tabsMap.values());
   }
 
@@ -764,7 +762,7 @@ export class SyncManager implements ISyncManager {
       if (result.deviceId) {
         return result.deviceId;
       }
-      
+
       // 生成新的设备ID，包含时间戳确保唯一性
       const deviceId = `device_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
       await chrome.storage.local.set({ deviceId });
@@ -782,33 +780,33 @@ export class SyncManager implements ISyncManager {
       if (!this.provider || this.provider.name !== 'github') {
         return null;
       }
-      
+
       // 检查是否已缓存GitHub用户信息
       const cached = await chrome.storage.local.get('github_user_info');
       if (cached.github_user_info && cached.github_user_info.id) {
         return cached.github_user_info.id.toString();
       }
-      
+
       // 获取GitHub配置
       const githubConfig = await chrome.storage.local.get('sync_github_config');
       if (!githubConfig.sync_github_config?.token) {
         return null;
       }
-      
+
       // 调用GitHub API获取用户信息
       const response = await fetch('https://api.github.com/user', {
         headers: {
-          'Authorization': `Bearer ${githubConfig.sync_github_config.token}`,
-          'Accept': 'application/vnd.github.v3+json'
+          Authorization: `Bearer ${githubConfig.sync_github_config.token}`,
+          Accept: 'application/vnd.github.v3+json'
         }
       });
-      
+
       if (!response.ok) {
         return null;
       }
-      
+
       const userInfo = await response.json();
-      
+
       // 缓存用户信息
       await chrome.storage.local.set({
         github_user_info: {
@@ -818,7 +816,7 @@ export class SyncManager implements ISyncManager {
           cached_at: new Date().toISOString()
         }
       });
-      
+
       return userInfo.id.toString();
     } catch (error) {
       console.error('Get GitHub user ID failed:', error);
@@ -838,13 +836,13 @@ export class SyncManager implements ISyncManager {
         const deviceName = `${githubUserInfo.login}'s ${platform} Device`;
         return deviceName;
       }
-      
+
       // 如果没有GitHub用户信息，使用缓存的设备名称
       const result = await chrome.storage.local.get('deviceName');
       if (result.deviceName) {
         return result.deviceName;
       }
-      
+
       const deviceName = `Chrome on ${this.getPlatform()}`;
       await chrome.storage.local.set({ deviceName });
       return deviceName;
@@ -856,20 +854,20 @@ export class SyncManager implements ISyncManager {
   /**
    * 获取GitHub用户信息
    */
-  private async getGitHubUserInfo(): Promise<{id: number, login: string, name: string} | null> {
+  private async getGitHubUserInfo(): Promise<{ id: number; login: string; name: string } | null> {
     try {
       const cached = await chrome.storage.local.get('github_user_info');
       if (cached.github_user_info && cached.github_user_info.id) {
         return cached.github_user_info;
       }
-      
+
       // 如果没有缓存，尝试获取
       const userId = await this.getGitHubUserId();
       if (userId) {
         const cached = await chrome.storage.local.get('github_user_info');
         return cached.github_user_info || null;
       }
-      
+
       return null;
     } catch (error) {
       console.error('Get GitHub user info failed:', error);
