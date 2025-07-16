@@ -11,12 +11,6 @@ import type { SyncStatus } from '../types/sync';
  */
 export async function initializeSync(): Promise<void> {
   try {
-    // 检查同步是否启用
-    const syncEnabled = await checkSyncEnabled();
-    if (!syncEnabled) {
-      console.log('Sync is disabled in settings, skipping sync system initialization');
-      return;
-    }
 
     // 监听同步状态变化
     syncManager.onStatusChange((status: SyncStatus) => {
@@ -97,15 +91,15 @@ export function handleSyncMessages(
 }
 
 /**
- * 检查同步是否启用
+ * 检查是否配置了远程同步提供商
  */
-async function checkSyncEnabled(): Promise<boolean> {
-  return new Promise((resolve) => {
-    chrome.storage.local.get(['settings'], (result) => {
-      const syncEnabled = result.settings?.sync?.enabled || false;
-      resolve(syncEnabled);
-    });
-  });
+async function checkSyncConfigured(): Promise<boolean> {
+  try {
+    const config = syncManager.config;
+    return config.providerConfig && Object.keys(config.providerConfig).length > 0;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -113,15 +107,6 @@ async function checkSyncEnabled(): Promise<boolean> {
  */
 async function handleSyncRequest(sendResponse: (response: any) => void): Promise<void> {
   try {
-    const syncEnabled = await checkSyncEnabled();
-    if (!syncEnabled) {
-      sendResponse({
-        success: false,
-        error: 'Sync is disabled in settings'
-      });
-      return;
-    }
-
     const result = await syncManager.sync();
     sendResponse({
       success: result.success,
@@ -141,15 +126,6 @@ async function handleSyncRequest(sendResponse: (response: any) => void): Promise
  */
 async function handleUploadRequest(sendResponse: (response: any) => void): Promise<void> {
   try {
-    const syncEnabled = await checkSyncEnabled();
-    if (!syncEnabled) {
-      sendResponse({
-        success: false,
-        error: 'Sync is disabled in settings'
-      });
-      return;
-    }
-
     const result = await syncManager.upload();
     sendResponse({
       success: result.success,
@@ -169,15 +145,6 @@ async function handleUploadRequest(sendResponse: (response: any) => void): Promi
  */
 async function handleDownloadRequest(sendResponse: (response: any) => void): Promise<void> {
   try {
-    const syncEnabled = await checkSyncEnabled();
-    if (!syncEnabled) {
-      sendResponse({
-        success: false,
-        error: 'Sync is disabled in settings'
-      });
-      return;
-    }
-
     const result = await syncManager.download();
     sendResponse({
       success: result.success,
@@ -220,13 +187,13 @@ export function setupPeriodicSync(): void {
   // 每小时检查一次是否需要同步
   setInterval(async () => {
     try {
-      const syncEnabled = await checkSyncEnabled();
-      if (!syncEnabled) {
+      const syncConfigured = await checkSyncConfigured();
+      if (!syncConfigured) {
         return;
       }
 
       const config = syncManager.config;
-      if (!config.autoSync || !config.lastSync) {
+      if (!config.lastSync) {
         return;
       }
 
@@ -250,17 +217,14 @@ export function setupPeriodicSync(): void {
  */
 export async function performStartupSync(): Promise<void> {
   try {
-    const syncEnabled = await checkSyncEnabled();
-    if (!syncEnabled) {
-      console.log('Sync is disabled, skipping startup sync');
+    const syncConfigured = await checkSyncConfigured();
+    if (!syncConfigured) {
+      console.log('Remote sync not configured, skipping startup sync');
       return;
     }
 
     const config = syncManager.config;
-    if (!config.autoSync) {
-      return;
-    }
-
+    
     // 如果上次同步时间超过同步间隔，则执行同步
     if (config.lastSync) {
       const lastSyncTime = new Date(config.lastSync).getTime();

@@ -59,13 +59,6 @@ export class SyncManager implements ISyncManager {
 
       // 重新初始化提供商
       await this.initializeProvider();
-
-      // 重新设置自动同步
-      if (config.autoSync) {
-        this.enableAutoSync();
-      } else {
-        this.disableAutoSync();
-      }
     } catch (error) {
       console.error('Set sync config failed:', error);
       throw error;
@@ -85,8 +78,8 @@ export class SyncManager implements ISyncManager {
       // 重置配置为默认值
       this._config = {
         provider: 'github',
-        autoSync: false,
-        syncInterval: 30,
+        autoSync: true, // 默认启用，但实际不再使用此字段
+        syncInterval: 30, // 保留字段以兼容现有代码
         providerConfig: {},
         lastSync: undefined
       };
@@ -115,19 +108,7 @@ export class SyncManager implements ISyncManager {
       console.log('=== Starting sync ===');
       this.setStatus('syncing');
 
-      // 第一步：检查 sync.enabled 状态
-      const localData = await StorageManager.getData();
-      if (!localData.settings.sync.enabled) {
-        console.log('🔴 Sync is disabled, skipping sync');
-        this.setStatus('idle');
-        return {
-          success: true,
-          message: '同步已禁用，不执行任何操作',
-          timestamp: new Date().toISOString()
-        };
-      }
-
-      console.log('🟢 Sync is enabled, proceeding with sync');
+      console.log('🟢 Starting sync process');
 
       if (!this.provider) {
         console.log('No provider, initializing...');
@@ -270,18 +251,6 @@ export class SyncManager implements ISyncManager {
     try {
       this.setStatus('syncing');
 
-      // 检查 sync.enabled 状态
-      const localStorageData = await StorageManager.getData();
-      if (!localStorageData.settings.sync.enabled) {
-        console.log('🔴 Sync is disabled, skipping upload');
-        this.setStatus('idle');
-        return {
-          success: true,
-          message: '同步已禁用，不执行上传操作',
-          timestamp: new Date().toISOString()
-        };
-      }
-
       if (!this.provider) {
         await this.initializeProvider();
       }
@@ -319,18 +288,6 @@ export class SyncManager implements ISyncManager {
   async download(): Promise<SyncResult> {
     try {
       this.setStatus('syncing');
-
-      // 检查 sync.enabled 状态
-      const localStorageData = await StorageManager.getData();
-      if (!localStorageData.settings.sync.enabled) {
-        console.log('🔴 Sync is disabled, skipping download');
-        this.setStatus('idle');
-        return {
-          success: true,
-          message: '同步已禁用，不执行下载操作',
-          timestamp: new Date().toISOString()
-        };
-      }
 
       if (!this.provider) {
         await this.initializeProvider();
@@ -415,32 +372,18 @@ export class SyncManager implements ISyncManager {
   }
 
   /**
-   * 启用自动同步
+   * 启用自动同步（已废弃，保留以兼容现有代码）
    */
   enableAutoSync(): void {
-    this.disableAutoSync(); // 先清除现有的定时器
-
-    if (this._config.syncInterval > 0) {
-      this.autoSyncTimer = setInterval(async () => {
-        try {
-          // 在每次自动同步前检查sync.enabled状态
-          const localData = await StorageManager.getData();
-          if (!localData.settings.sync.enabled) {
-            console.log('🔴 Sync is disabled, skipping auto sync');
-            return;
-          }
-          await this.sync();
-        } catch (error) {
-          console.error('Auto sync failed:', error);
-        }
-      }, this._config.syncInterval * 60 * 1000); // 转换为毫秒
-    }
+    // 不再使用定时器自动同步，改为实时同步
+    console.log('Auto sync is now handled by real-time sync integration');
   }
 
   /**
-   * 禁用自动同步
+   * 禁用自动同步（已废弃，保留以兼容现有代码）
    */
   disableAutoSync(): void {
+    // 清理可能存在的定时器
     if (this.autoSyncTimer) {
       clearInterval(this.autoSyncTimer);
       this.autoSyncTimer = null;
@@ -452,6 +395,26 @@ export class SyncManager implements ISyncManager {
    */
   getStatus(): SyncStatus {
     return this._status;
+  }
+
+  /**
+   * 检查是否已认证
+   */
+  async isAuthenticated(): Promise<boolean> {
+    try {
+      if (!this.provider) {
+        await this.initializeProvider();
+      }
+
+      if (!this.provider) {
+        return false;
+      }
+
+      return await this.provider.isAuthenticated();
+    } catch (error) {
+      console.error('Check authentication failed:', error);
+      return false;
+    }
   }
 
   /**
@@ -568,13 +531,16 @@ export class SyncManager implements ISyncManager {
   /**
    * 基于元数据的智能同步决策
    */
-  private makeSyncDecision(localData: any, remoteData: SyncData | null): {
+  private makeSyncDecision(
+    localData: any,
+    remoteData: SyncData | null
+  ): {
     action: 'upload_local' | 'download_remote' | 'merge' | 'conflict' | 'no_action';
     reason: string;
   } {
     const hasLocalGroups = localData.groups && localData.groups.length > 0;
     const hasRemoteData = remoteData && remoteData.data.groups && remoteData.data.groups.length > 0;
-    
+
     console.log('📊 Sync decision analysis:', {
       hasLocalGroups,
       hasRemoteData,
@@ -612,30 +578,32 @@ export class SyncManager implements ISyncManager {
       const localLastModified = new Date(localData.metadata?.lastModified || 0).getTime();
       const localLastSync = new Date(localData.metadata?.lastSyncTimestamp || 0).getTime();
       const remoteTimestamp = new Date(remoteData!.timestamp).getTime();
-      
+
       // 检查是否来自同一设备
       const isSameDevice = localData.metadata?.deviceId === remoteData!.device?.id;
-      
+
       // 如果本地数据在上次同步后被修改，且远程数据也比上次同步新
       if (localLastModified > localLastSync && remoteTimestamp > localLastSync) {
         if (isSameDevice) {
           // 同一设备，选择较新的数据
-          return localLastModified > remoteTimestamp ? {
-            action: 'upload_local',
-            reason: '同设备数据冲突，本地数据较新，上传本地数据'
-          } : {
-            action: 'download_remote', 
-            reason: '同设备数据冲突，远程数据较新，下载远程数据'
-          };
+          return localLastModified > remoteTimestamp
+            ? {
+                action: 'upload_local',
+                reason: '同设备数据冲突，本地数据较新，上传本地数据'
+              }
+            : {
+                action: 'download_remote',
+                reason: '同设备数据冲突，远程数据较新，下载远程数据'
+              };
         }
-        
+
         // 不同设备，需要用户解决冲突
         return {
           action: 'conflict',
           reason: '检测到来自不同设备的数据冲突，需要用户选择解决方案'
         };
       }
-      
+
       // 如果只有本地数据被修改
       if (localLastModified > localLastSync) {
         return {
@@ -643,7 +611,7 @@ export class SyncManager implements ISyncManager {
           reason: '本地数据有更新，上传到远程'
         };
       }
-      
+
       // 如果只有远程数据更新
       if (remoteTimestamp > localLastSync) {
         return {
@@ -651,7 +619,7 @@ export class SyncManager implements ISyncManager {
           reason: '远程数据有更新，下载到本地'
         };
       }
-      
+
       // 两边数据都没有变化
       return {
         action: 'no_action',
@@ -707,8 +675,8 @@ export class SyncManager implements ISyncManager {
   private performThreeWayMerge(local: SyncData, remote: SyncData, metadata: any): SyncData {
     // 简化的三路合并实现
     const mergedGroups = [...(local.data.groups || []), ...(remote.data.groups || [])];
-    const uniqueGroups = mergedGroups.filter((group, index, self) => 
-      index === self.findIndex(g => g.id === group.id)
+    const uniqueGroups = mergedGroups.filter(
+      (group, index, self) => index === self.findIndex((g) => g.id === group.id)
     );
 
     const mergedSettings = {
@@ -922,7 +890,7 @@ export class SyncManager implements ISyncManager {
 
       // 生成新的设备ID
       const deviceId = `device_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
-      
+
       // 更新存储数据
       const updatedData = {
         ...storageData,
@@ -932,7 +900,7 @@ export class SyncManager implements ISyncManager {
         }
       };
       await StorageManager.setData(updatedData);
-      
+
       return deviceId;
     } catch (error) {
       return `device_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
@@ -1027,8 +995,6 @@ export class SyncManager implements ISyncManager {
     }
   }
 
-
-
   /**
    * 获取GitHub用户信息
    */
@@ -1052,8 +1018,6 @@ export class SyncManager implements ISyncManager {
       return null;
     }
   }
-
-
 
   /**
    * 保存配置

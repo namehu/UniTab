@@ -27,15 +27,20 @@ import { syncManager } from './utils/sync/SyncManager.js'
 import { initializeSync, handleSyncMessages } from './background/syncIntegration.js'
 
 /**
- * 检查同步是否启用并触发同步
+ * 检查是否配置了远程同步并触发同步
  */
 async function triggerSyncIfEnabled(): Promise<void> {
   try {
-    const storageData = await StorageManager.getData()
-    if (!storageData.settings?.sync?.enabled) {
-      return // 同步未启用，跳过
+    // 检查是否配置了远程同步提供商
+    const config = syncManager.config
+    console.log('Checking sync config:', config)
+    
+    if (!config.providerConfig || Object.keys(config.providerConfig).length === 0) {
+      console.log('Remote sync not configured, skipping auto sync')
+      return // 未配置远程同步，跳过
     }
     
+    console.log('Triggering auto sync after data change')
     // 异步触发同步，不等待结果
     syncManager.sync().catch(error => {
       console.log('Background sync failed:', error)
