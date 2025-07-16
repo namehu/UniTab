@@ -718,34 +718,6 @@ export class SyncManager implements ISyncManager {
   }
 
   /**
-   * 检查数据是否有实质性差异
-   */
-  private hasSignificantDataDifference(local: SyncData, remote: SyncData): boolean {
-    // 比较分组数量
-    const localGroupCount = local.data.groups?.length || 0;
-    const remoteGroupCount = remote.data.groups?.length || 0;
-
-    // 如果分组数量差异超过阈值，认为有差异
-    if (Math.abs(localGroupCount - remoteGroupCount) > 0) {
-      return true;
-    }
-
-    // 比较分组内容（简化版本，比较分组ID）
-    const localGroupIds = new Set(local.data.groups?.map((g) => g.id) || []);
-    const remoteGroupIds = new Set(remote.data.groups?.map((g) => g.id) || []);
-
-    // 检查是否有不同的分组
-    for (const id of localGroupIds) {
-      if (!remoteGroupIds.has(id)) return true;
-    }
-    for (const id of remoteGroupIds) {
-      if (!localGroupIds.has(id)) return true;
-    }
-
-    return false;
-  }
-
-  /**
    * 智能合并数据
    */
   private mergeData(local: SyncData, remote: SyncData): SyncData {

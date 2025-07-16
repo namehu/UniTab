@@ -27,12 +27,7 @@ export const DEFAULT_DATA: StorageData = {
     deviceId: generateDeviceId()
   },
   settings: {
-    excludeList: [
-      'chrome://',
-      'chrome-extension://',
-      'edge://',
-      'about:'
-    ]
+    excludeList: ['chrome://', 'chrome-extension://', 'edge://', 'about:']
   },
   groups: []
 };
@@ -50,11 +45,11 @@ export class StorageManager {
     try {
       const result = await chrome.storage.local.get(STORAGE_KEY);
       const data = result[STORAGE_KEY];
-      
+
       if (!data) {
         return DEFAULT_DATA;
       }
-      
+
       // 确保数据结构完整性
       return this.validateAndFixData(data);
     } catch (error) {
@@ -147,7 +142,7 @@ export class StorageManager {
     };
 
     // 自动保存修复后的数据
-    this.setData(fixedData).catch(error => {
+    this.setData(fixedData).catch((error) => {
       console.error('Failed to save fixed data:', error);
     });
 
@@ -218,7 +213,7 @@ export function isValidUrl(url: string): boolean {
  * @returns 是否应该排除
  */
 export function shouldExcludeUrl(url: string, excludeList: string[]): boolean {
-  return excludeList.some(excludeUrl => url.startsWith(excludeUrl));
+  return excludeList.some((excludeUrl) => url.startsWith(excludeUrl));
 }
 
 /**
@@ -228,8 +223,6 @@ export function shouldExcludeUrl(url: string, excludeList: string[]): boolean {
 export function generateId(): number {
   return Date.now();
 }
-
-
 
 /**
  * 更新数据的元数据

@@ -63,10 +63,6 @@ export default defineConfig({
         {
           src: 'src/tab_list.html',
           dest: '.'
-        },
-        {
-          src: 'src/debug_sync.html',
-          dest: '.'
         }
       ],
     }),
