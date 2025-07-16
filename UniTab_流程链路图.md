@@ -127,13 +127,13 @@ sequenceDiagram
     
     Note over BG: 扩展启动时
     BG->>SI: initializeSync()
-    SI->>ST: 检查 sync.enabled 状态
-    ST->>SI: 返回 sync.enabled 值
+    SI->>ST: 检查同步配置状态
+    ST->>SI: 返回配置状态
     
-    alt sync.enabled = false
+    alt 未配置同步
         SI->>BG: 记录日志：同步已禁用
         Note over SI: "Sync is disabled, skipping initialization"
-    else sync.enabled = true
+    else 已配置同步
         SI->>SM: 初始化 SyncManager
         SM->>SM: 加载同步配置
         SM->>SM: 检查认证状态
@@ -142,10 +142,10 @@ sequenceDiagram
         
         SI->>SI: 设置定期同步
         loop 每次定期同步
-            SI->>ST: 检查 sync.enabled 状态
-            alt sync.enabled = true
+            SI->>ST: 检查同步配置状态
+            alt 已配置同步
                 SI->>SM: 执行定期同步
-            else sync.enabled = false
+            else 未配置同步
                 SI->>SI: 跳过定期同步
             end
         end
@@ -163,7 +163,7 @@ graph TB
     end
     
     subgraph "配置层"
-        E[sync.enabled 开关]
+        E[同步配置状态]
         F[GitHub Token 认证]
         G[Gist API 访问]
     end
@@ -174,7 +174,7 @@ graph TB
     end
     
     D --> E
-    E -->|enabled=true| A
+    E -->|已配置| A
     D --> A
     C --> F
     F --> G
@@ -197,12 +197,12 @@ sequenceDiagram
     
     U->>UI: 点击"同步"按钮
     UI->>SM: 调用 sync() 方法
-    SM->>SM: 检查 sync.enabled 状态
+    SM->>SM: 检查同步配置状态
     
-    alt sync.enabled = false
+    alt 未配置同步
         SM->>UI: 返回 "同步已禁用" 消息
         UI->>U: 显示同步禁用提示
-    else sync.enabled = true
+    else 已配置同步
         SM->>SM: 设置状态为 'syncing'
         SM->>GP: 检查认证状态
         GP->>API: 验证 Token
@@ -245,11 +245,11 @@ sequenceDiagram
     participant GP as GitHubProvider
     
     Note over BG: 用户执行操作（删除分组等）
-    BG->>BG: 检查 sync.enabled 状态
+    BG->>BG: 检查同步配置状态
     
-    alt sync.enabled = false
+    alt 未配置同步
         BG->>BG: 记录日志：同步已禁用，跳过同步
-    else sync.enabled = true
+    else 已配置同步
         BG->>SM: 异步调用 sync() 方法
         SM->>SM: 检查认证状态和配置
         
@@ -362,10 +362,10 @@ flowchart LR
 ### 5.2 数据同步策略
 
 1. **同步启用检查**：
-   - 所有同步操作前都会检查 `sync.enabled` 状态
-   - 系统初始化时检查是否启用同步功能
+   - 所有同步操作前都会检查同步配置状态
+   - 系统初始化时检查是否配置了远程同步提供商
    - 定期同步和实时同步都遵循此检查
-   - 禁用时跳过所有同步操作并记录日志
+   - 未配置时跳过所有同步操作并记录日志
 
 2. **实时同步触发**：
    - 所有数据变更操作后都会检查同步状态
@@ -387,11 +387,11 @@ flowchart LR
 ```mermaid
 flowchart TD
     A[操作执行] --> B{是否成功}
-    B -->|成功| C[检查 sync.enabled]
+    B -->|成功| C[检查同步配置]
     B -->|失败| D[显示错误信息]
     
-    C -->|enabled=false| E[跳过同步]
-    C -->|enabled=true| F[异步执行同步]
+    C -->|未配置| E[跳过同步]
+    C -->|已配置| F[异步执行同步]
     
     F --> G{认证状态}
     G -->|已认证| H[执行同步]
@@ -426,7 +426,7 @@ flowchart TD
 
 ### 7.3 数据结构扩展
 
-在 settings 中增加一个关键的布尔值字段 sync.enabled。
+同步配置通过 SyncManager 管理，包含提供商类型和认证信息。
 
 ```json
 {
@@ -437,11 +437,6 @@ flowchart TD
     "deviceId": "device_unique_id_A"
   },
   "settings": {
-    "sync": {
-      "enabled": true, // <-- 核心开关
-      "provider": "github",
-      "gistId": "YOUR_GIST_ID"
-    },
     "excludeList": [ "localhost" ]
   },
   "groups": [ ... ] // 结构不变
@@ -452,16 +447,16 @@ flowchart TD
 
 #### 7.4.1 状态定义
 
-* **在线模式 (Sync Enabled):** settings.sync.enabled 为 true。插件会在启动、本地修改后、定时触发自动同步流程。
-* **离线模式 (Sync Disabled):** settings.sync.enabled 为 false。插件不会执行任何网络请求，所有操作都只影响本地 chrome.storage。
+* **在线模式 (Sync Configured):** 已配置远程同步提供商。插件会在启动、本地修改后、定时触发自动同步流程。
+* **离线模式 (Sync Not Configured):** 未配置远程同步提供商。插件不会执行任何网络请求，所有操作都只影响本地 chrome.storage。
 
 #### 7.4.2 更新后的同步流程图
 
 ```mermaid
 graph TD
-    A["同步事件触发<br>(启动、修改、定时、<b>重连</b>)"] --> B{"检查 sync.enabled 状态"};
-    B -- "🔴 禁用 (false)" --> C["不执行任何操作，结束"];
-    B -- "🟢 启用 (true)" --> D{"获取远程元数据<br>(Gist last_updated_at)"};
+    A["同步事件触发<br>(启动、修改、定时、<b>重连</b>)"] --> B{"检查同步配置状态"};
+    B -- "🔴 未配置" --> C["不执行任何操作，结束"];
+    B -- "🟢 已配置" --> D{"获取远程元数据<br>(Gist last_updated_at)"};
 
     D --> E{"比较 远程时间戳<br>与 本地lastSyncTimestamp"};
     E --> F_NO_CHANGE["时间戳相同<br>✅ 无需操作，结束"];
@@ -486,8 +481,8 @@ graph TD
 #### 7.4.3 关键场景处理
 
 1. **断开同步 (用户操作):**
-   * 用户在选项页关闭同步开关。
-   * 插件将 settings.sync.enabled 设置为 false。
+   * 用户在同步设置页面移除同步配置。
+   * 插件将清除同步提供商配置。
    * 所有正在进行的或计划中的同步任务都将取消。
    * 此时 lastSyncTimestamp 将被"冻结"，成为未来恢复同步时的重要基准。
 
@@ -496,7 +491,7 @@ graph TD
    * 每次修改都会更新 metadata.lastModified 时间戳，但 lastSyncTimestamp 保持不变。
 
 3. **重新连接同步 (用户操作):**
-   * 用户在选项页重新打开同步开关。
+   * 用户在同步设置页面重新配置同步提供商。
    * 这会立即触发一次手动的、高优先级的 **"同步事件"**。
    * 流程启动，进入流程图的 A 点。
    * 系统会发现 remote_timestamp (来自 Gist) 和 local.lastModified 都可能大于被"冻结"的 lastSyncTimestamp，这会大概率导向 K_CONFLICT (冲突检测)。

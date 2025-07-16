@@ -30,22 +30,8 @@ export interface TabGroup {
   tabs: TabData[];
 }
 
-// 同步设置
-export interface SyncSettings {
-  /** 是否启用同步 */
-  enabled: boolean;
-  /** 同步服务提供商 */
-  provider: string | null;
-  /** GitHub Gist ID */
-  gistId: string | null;
-  /** 最后同步时间 */
-  lastSync: string | null;
-}
-
 // 应用设置
 export interface AppSettings {
-  /** 同步相关设置 */
-  sync: SyncSettings;
   /** 排除列表（不保存的URL前缀） */
   excludeList: string[];
 }

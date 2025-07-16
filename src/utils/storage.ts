@@ -27,12 +27,6 @@ export const DEFAULT_DATA: StorageData = {
     deviceId: generateDeviceId()
   },
   settings: {
-    sync: {
-      enabled: false,
-      provider: null,
-      gistId: null,
-      lastSync: null
-    },
     excludeList: [
       'chrome://',
       'chrome-extension://',
@@ -143,16 +137,10 @@ export class StorageManager {
       version: '1.2.0',
       metadata: data.metadata || {
         lastModified: new Date().toISOString(),
-        lastSyncTimestamp: data.settings?.sync?.lastSync || '',
+        lastSyncTimestamp: '',
         deviceId: generateDeviceId()
       },
       settings: {
-        sync: {
-          enabled: data.settings?.sync?.enabled ?? false,
-          provider: data.settings?.sync?.provider || null,
-          gistId: data.settings?.sync?.gistId || null,
-          lastSync: data.settings?.sync?.lastSync || null
-        },
         excludeList: data.settings?.excludeList || DEFAULT_DATA.settings.excludeList
       },
       groups: data.groups || []
