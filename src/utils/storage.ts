@@ -20,7 +20,7 @@ export function generateDeviceId(): string {
 
 /** 默认数据结构 */
 export const DEFAULT_DATA: StorageData = {
-  version: '1.2.0',
+  version: '1.0.0',
   metadata: {
     lastModified: new Date().toISOString(),
     lastSyncTimestamp: '',
@@ -45,13 +45,7 @@ export class StorageManager {
     try {
       const result = await chrome.storage.local.get(STORAGE_KEY);
       const data = result[STORAGE_KEY];
-
-      if (!data) {
-        return DEFAULT_DATA;
-      }
-
-      // 确保数据结构完整性
-      return this.validateAndFixData(data);
+      return data || DEFAULT_DATA;
     } catch (error) {
       console.error('Failed to get storage data:', error);
       return DEFAULT_DATA;
@@ -112,41 +106,6 @@ export class StorageManager {
       console.error('Failed to get storage usage:', error);
       return 0;
     }
-  }
-
-  /**
-   * 验证并修复数据结构
-   * @param data 原始数据
-   * @returns 验证后的数据
-   */
-  static validateAndFixData(data: any): StorageData {
-    // 如果数据结构完整，直接返回
-    if (data.version === '1.2.0' && data.metadata && data.settings && data.groups) {
-      return data as StorageData;
-    }
-
-    console.log('Fixing data structure to version 1.2.0');
-
-    // 修复数据结构
-    const fixedData: StorageData = {
-      version: '1.2.0',
-      metadata: data.metadata || {
-        lastModified: new Date().toISOString(),
-        lastSyncTimestamp: '',
-        deviceId: generateDeviceId()
-      },
-      settings: {
-        excludeList: data.settings?.excludeList || DEFAULT_DATA.settings.excludeList
-      },
-      groups: data.groups || []
-    };
-
-    // 自动保存修复后的数据
-    this.setData(fixedData).catch((error) => {
-      console.error('Failed to save fixed data:', error);
-    });
-
-    return fixedData;
   }
 }
 

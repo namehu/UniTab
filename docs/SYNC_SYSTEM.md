@@ -48,7 +48,6 @@ export interface ISyncManager {
   upload(): Promise<SyncResult>;
   download(): Promise<SyncResult>;
   resolveConflict(conflict: SyncConflict, resolution: ConflictResolution): Promise<SyncResult>;
-  enableAutoSync(): void;
   disableAutoSync(): void;
 }
 ```

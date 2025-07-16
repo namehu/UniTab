@@ -20,8 +20,6 @@ export interface SyncConfig {
   provider: SyncProvider;
   /** 是否启用自动同步 */
   autoSync: boolean;
-  /** 自动同步间隔（分钟） */
-  syncInterval: number;
   /** 最后同步时间 */
   lastSync?: string;
   /** 提供商特定配置 */
@@ -107,28 +105,28 @@ export interface SyncConflict {
 export interface ISyncProvider {
   /** 提供商名称 */
   readonly name: SyncProvider;
-  
+
   /** 初始化提供商 */
   initialize(config: Record<string, any>): Promise<void>;
-  
+
   /** 检查是否已认证 */
   isAuthenticated(): Promise<boolean>;
-  
+
   /** 进行认证 */
   authenticate(): Promise<boolean>;
-  
+
   /** 上传数据 */
   upload(data: SyncData): Promise<SyncResult>;
-  
+
   /** 下载数据 */
   download(): Promise<SyncData>;
-  
+
   /** 检查远程是否有更新 */
   hasRemoteUpdates(localTimestamp: string): Promise<boolean>;
-  
+
   /** 删除远程数据 */
   deleteRemote(): Promise<SyncResult>;
-  
+
   /** 获取同步历史 */
   getSyncHistory?(): Promise<SyncResult[]>;
 }
@@ -139,37 +137,34 @@ export interface ISyncProvider {
 export interface ISyncManager {
   /** 当前同步状态 */
   readonly status: SyncStatus;
-  
+
   /** 当前配置 */
   readonly config: SyncConfig;
-  
+
   /** 设置同步配置 */
   setConfig(config: SyncConfig): Promise<void>;
-  
+
   /** 手动同步 */
   sync(): Promise<SyncResult>;
-  
+
   /** 上传到远程 */
   upload(): Promise<SyncResult>;
-  
+
   /** 从远程下载 */
   download(): Promise<SyncResult>;
-  
+
   /** 解决同步冲突 */
   resolveConflict(conflict: SyncConflict, resolution: ConflictResolution): Promise<SyncResult>;
-  
-  /** 启用自动同步 */
-  enableAutoSync(): void;
-  
+
   /** 禁用自动同步 */
   disableAutoSync(): void;
-  
+
   /** 获取同步状态 */
   getStatus(): SyncStatus;
-  
+
   /** 监听同步状态变化 */
   onStatusChange(callback: (status: SyncStatus) => void): void;
-  
+
   /** 移除同步状态变化监听器 */
   offStatusChange(callback: (status: SyncStatus) => void): void;
 }

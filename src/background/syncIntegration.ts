@@ -11,7 +11,6 @@ import type { SyncStatus } from '../types/sync';
  */
 export async function initializeSync(): Promise<void> {
   try {
-
     // 监听同步状态变化
     syncManager.onStatusChange((status: SyncStatus) => {
       console.log('Sync status changed:', status);
@@ -26,13 +25,6 @@ export async function initializeSync(): Promise<void> {
           // 忽略没有监听器的错误
         });
     });
-
-    // 如果启用了自动同步，则启动自动同步
-    const config = syncManager.config;
-    if (config.autoSync) {
-      syncManager.enableAutoSync();
-      console.log('Auto sync enabled with interval:', config.syncInterval, 'minutes');
-    }
 
     console.log('Sync system initialized successfully');
   } catch (error) {
@@ -185,31 +177,34 @@ async function handleSetConfigRequest(config: any, sendResponse: (response: any)
  */
 export function setupPeriodicSync(): void {
   // 每小时检查一次是否需要同步
-  setInterval(async () => {
-    try {
-      const syncConfigured = await checkSyncConfigured();
-      if (!syncConfigured) {
-        return;
-      }
+  setInterval(
+    async () => {
+      try {
+        const syncConfigured = await checkSyncConfigured();
+        if (!syncConfigured) {
+          return;
+        }
 
-      const config = syncManager.config;
-      if (!config.lastSync) {
-        return;
-      }
+        const config = syncManager.config;
+        if (!config.lastSync) {
+          return;
+        }
 
-      const lastSyncTime = new Date(config.lastSync).getTime();
-      const now = Date.now();
-      const intervalMs = config.syncInterval * 60 * 1000;
+        const lastSyncTime = new Date(config.lastSync).getTime();
+        const now = Date.now();
+        const intervalMs = 60 * 1000;
 
-      // 如果超过设定间隔且没有正在同步，则执行同步
-      if (now - lastSyncTime > intervalMs && syncManager.getStatus() === 'idle') {
-        console.log('Performing periodic sync check...');
-        await syncManager.sync();
+        // 如果超过设定间隔且没有正在同步，则执行同步
+        if (now - lastSyncTime > intervalMs && syncManager.getStatus() === 'idle') {
+          console.log('Performing periodic sync check...');
+          await syncManager.sync();
+        }
+      } catch (error) {
+        console.error('Periodic sync check failed:', error);
       }
-    } catch (error) {
-      console.error('Periodic sync check failed:', error);
-    }
-  }, 60 * 60 * 1000); // 每小时检查一次
+    },
+    60 * 60 * 1000
+  ); // 每小时检查一次
 }
 
 /**
@@ -224,12 +219,12 @@ export async function performStartupSync(): Promise<void> {
     }
 
     const config = syncManager.config;
-    
+
     // 如果上次同步时间超过同步间隔，则执行同步
     if (config.lastSync) {
       const lastSyncTime = new Date(config.lastSync).getTime();
       const now = Date.now();
-      const intervalMs = config.syncInterval * 60 * 1000;
+      const intervalMs = 60 * 1000;
 
       if (now - lastSyncTime > intervalMs) {
         console.log('Performing startup sync...');

@@ -28,7 +28,6 @@ export class SyncManager implements ISyncManager {
     this._config = {
       provider: 'github',
       autoSync: false,
-      syncInterval: 30, // 30分钟
       providerConfig: {}
     };
 
@@ -79,7 +78,6 @@ export class SyncManager implements ISyncManager {
       this._config = {
         provider: 'github',
         autoSync: true, // 默认启用，但实际不再使用此字段
-        syncInterval: 30, // 保留字段以兼容现有代码
         providerConfig: {},
         lastSync: undefined
       };
@@ -369,14 +367,6 @@ export class SyncManager implements ISyncManager {
         timestamp: new Date().toISOString()
       };
     }
-  }
-
-  /**
-   * 启用自动同步（已废弃，保留以兼容现有代码）
-   */
-  enableAutoSync(): void {
-    // 不再使用定时器自动同步，改为实时同步
-    console.log('Auto sync is now handled by real-time sync integration');
   }
 
   /**

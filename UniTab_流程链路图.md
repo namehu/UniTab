@@ -354,7 +354,7 @@ flowchart LR
 |------|------|----------|
 | **Background Script** | 消息处理、业务逻辑协调 | `aggregateCurrentWindowTabs()`, `deleteGroup()`, `restoreTabs()` |
 | **SyncIntegration** | 同步系统集成、初始化控制 | `initializeSync()`, `setupPeriodicSync()`, `checkSyncEnabled()` |
-| **SyncManager** | 同步逻辑管理、冲突处理 | `sync()`, `upload()`, `download()`, `enableAutoSync()`, `detectConflict()`, `resolveConflict()` |
+| **SyncManager** | 同步逻辑管理、冲突处理 | `sync()`, `upload()`, `download()`, `detectConflict()`, `resolveConflict()` |
 
 | **GitHubSyncProvider** | GitHub API 交互 | `upload()`, `download()`, `isAuthenticated()` |
 | **StorageManager** | 本地数据管理 | `getData()`, `setData()` |
