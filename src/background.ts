@@ -31,7 +31,7 @@ import { initializeSync, handleSyncMessages } from './background/syncIntegration
 async function triggerSyncIfEnabled(): Promise<void> {
   try {
     // 检查是否配置了远程同步提供商
-    const config = syncManager.config;
+    const { config } = syncManager;
     console.log('Checking sync config:', config);
 
     if (!config.providerConfig || Object.keys(config.providerConfig).length === 0) {

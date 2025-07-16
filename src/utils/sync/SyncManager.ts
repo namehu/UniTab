@@ -105,7 +105,6 @@ export class SyncManager implements ISyncManager {
     try {
       console.log('=== Starting sync ===');
       this.setStatus('syncing');
-
       console.log('🟢 Starting sync process');
 
       if (!this.provider) {
