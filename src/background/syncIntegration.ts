@@ -49,34 +49,6 @@ export function handleSyncMessages(
       handleUploadRequest(sendResponse);
       return true;
 
-    case 'download':
-      handleDownloadRequest(sendResponse);
-      return true;
-
-    case 'getSyncStatus':
-      sendResponse({
-        success: true,
-        status: syncManager.getStatus(),
-        config: syncManager.config
-      });
-      return false;
-
-    case 'setSyncConfig':
-      handleSetConfigRequest(request.config, sendResponse);
-      return true;
-
-    case 'getRealtimeSyncStatus':
-      sendResponse({
-        success: true,
-        enabled: true, // 实时同步现在总是启用的（集成在操作中）
-        pendingTasks: 0 // 不再有待处理任务队列
-      });
-      return false;
-
-    case 'forceSync':
-      handleSyncRequest(sendResponse); // 直接使用同步请求处理
-      return true;
-
     default:
       return false; // 不处理此消息
   }
@@ -133,81 +105,6 @@ async function handleUploadRequest(sendResponse: (response: any) => void): Promi
 }
 
 /**
- * 处理下载请求
- */
-async function handleDownloadRequest(sendResponse: (response: any) => void): Promise<void> {
-  try {
-    const result = await syncManager.download();
-    sendResponse({
-      success: result.success,
-      error: result.error,
-      timestamp: result.timestamp
-    });
-  } catch (error) {
-    sendResponse({
-      success: false,
-      error: error instanceof Error ? error.message : 'Download failed'
-    });
-  }
-}
-
-/**
- * 处理设置配置请求
- */
-async function handleSetConfigRequest(config: any, sendResponse: (response: any) => void): Promise<void> {
-  try {
-    await syncManager.setConfig(config);
-
-    // 实时同步现在集成在操作流程中，无需单独启用
-
-    sendResponse({
-      success: true,
-      config: syncManager.config
-    });
-  } catch (error) {
-    sendResponse({
-      success: false,
-      error: error instanceof Error ? error.message : 'Set config failed'
-    });
-  }
-}
-
-/**
- * 定期检查并执行同步（可选的额外保障）
- */
-export function setupPeriodicSync(): void {
-  // 每小时检查一次是否需要同步
-  setInterval(
-    async () => {
-      try {
-        const syncConfigured = await checkSyncConfigured();
-        if (!syncConfigured) {
-          return;
-        }
-
-        const config = syncManager.config;
-        if (!config.lastSync) {
-          return;
-        }
-
-        const lastSyncTime = new Date(config.lastSync).getTime();
-        const now = Date.now();
-        const intervalMs = 60 * 1000;
-
-        // 如果超过设定间隔且没有正在同步，则执行同步
-        if (now - lastSyncTime > intervalMs && syncManager.getStatus() === 'idle') {
-          console.log('Performing periodic sync check...');
-          await syncManager.sync();
-        }
-      } catch (error) {
-        console.error('Periodic sync check failed:', error);
-      }
-    },
-    60 * 60 * 1000
-  ); // 每小时检查一次
-}
-
-/**
  * 在扩展启动时自动同步（如果配置了）
  */
 export async function performStartupSync(): Promise<void> {
@@ -242,17 +139,5 @@ export async function performStartupSync(): Promise<void> {
     }
   } catch (error) {
     console.error('Startup sync failed:', error);
-  }
-}
-
-/**
- * 清理同步相关资源
- */
-export function cleanupSync(): void {
-  try {
-    syncManager.disableAutoSync();
-    console.log('Sync system cleaned up');
-  } catch (error) {
-    console.error('Failed to cleanup sync system:', error);
   }
 }

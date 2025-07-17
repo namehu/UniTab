@@ -353,7 +353,7 @@ flowchart LR
 | 组件 | 职责 | 关键方法 |
 |------|------|----------|
 | **Background Script** | 消息处理、业务逻辑协调 | `aggregateCurrentWindowTabs()`, `deleteGroup()`, `restoreTabs()` |
-| **SyncIntegration** | 同步系统集成、初始化控制 | `initializeSync()`, `setupPeriodicSync()`, `checkSyncEnabled()` |
+| **SyncIntegration** | 同步系统集成、初始化控制 | `initializeSync()`, `checkSyncEnabled()` |
 | **SyncManager** | 同步逻辑管理、冲突处理 | `sync()`, `upload()`, `download()`, `detectConflict()`, `resolveConflict()` |
 
 | **GitHubSyncProvider** | GitHub API 交互 | `upload()`, `download()`, `isAuthenticated()` |
