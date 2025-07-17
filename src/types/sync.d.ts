@@ -18,8 +18,6 @@ export type SyncStatus = 'idle' | 'syncing' | 'success' | 'error';
 export interface SyncConfig {
   /** 同步提供商 */
   provider: SyncProvider;
-  /** 是否启用自动同步 */
-  autoSync: boolean;
   /** 最后同步时间 */
   lastSync?: string;
   /** 提供商特定配置 */
@@ -155,9 +153,6 @@ export interface ISyncManager {
 
   /** 解决同步冲突 */
   resolveConflict(conflict: SyncConflict, resolution: ConflictResolution): Promise<SyncResult>;
-
-  /** 禁用自动同步 */
-  disableAutoSync(): void;
 
   /** 获取同步状态 */
   getStatus(): SyncStatus;

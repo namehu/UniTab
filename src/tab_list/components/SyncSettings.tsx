@@ -19,7 +19,6 @@ export const SyncSettings: React.FC<SyncSettingsProps> = ({ isOpen, onClose }) =
   const [status, setStatus] = useState<SyncStatus>(syncManager.getStatus());
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [lastSyncTime, setLastSyncTime] = useState<string>('');
   const [githubToken, setGithubToken] = useState('');
   const [showTokenInput, setShowTokenInput] = useState(false);
 
@@ -138,7 +137,6 @@ export const SyncSettings: React.FC<SyncSettingsProps> = ({ isOpen, onClose }) =
     try {
       const result = await syncManager.sync();
       if (result.success) {
-        setLastSyncTime(new Date().toLocaleString());
         if (result.merged) {
           alert('✅ ' + (result.message || '同步成功，已自动合并多设备数据'));
         } else {
@@ -225,7 +223,6 @@ export const SyncSettings: React.FC<SyncSettingsProps> = ({ isOpen, onClose }) =
         // 更新本地状态
         const defaultConfig = {
           provider: 'github' as SyncProvider,
-          autoSync: false,
           providerConfig: {},
           lastSync: undefined
         };

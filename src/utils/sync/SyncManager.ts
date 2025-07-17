@@ -21,13 +21,11 @@ export class SyncManager implements ISyncManager {
   private _status: SyncStatus = 'idle';
   private _config: SyncConfig;
   private provider: ISyncProvider | null = null;
-  private autoSyncTimer: ReturnType<typeof setInterval> | null = null;
   private statusCallbacks: ((status: SyncStatus) => void)[] = [];
 
   constructor() {
     this._config = {
       provider: 'github',
-      autoSync: false,
       providerConfig: {}
     };
 
@@ -69,15 +67,9 @@ export class SyncManager implements ISyncManager {
    */
   async clearConfig(): Promise<void> {
     try {
-      // 停止自动同步
-      this.disableAutoSync();
-
-      // 注意：实时同步功能已集成到操作流程中
-
       // 重置配置为默认值
       this._config = {
         provider: 'github',
-        autoSync: true, // 默认启用，但实际不再使用此字段
         providerConfig: {},
         lastSync: undefined
       };
@@ -365,17 +357,6 @@ export class SyncManager implements ISyncManager {
         error: error instanceof Error ? error.message : 'Resolve conflict failed',
         timestamp: new Date().toISOString()
       };
-    }
-  }
-
-  /**
-   * 禁用自动同步（已废弃，保留以兼容现有代码）
-   */
-  disableAutoSync(): void {
-    // 清理可能存在的定时器
-    if (this.autoSyncTimer) {
-      clearInterval(this.autoSyncTimer);
-      this.autoSyncTimer = null;
     }
   }
 

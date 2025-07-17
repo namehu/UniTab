@@ -133,19 +133,11 @@ async function aggregateCurrentWindowTabs(): Promise<void> {
 }
 
 /**
- * 获取存储数据（保持向后兼容）
- * @returns 存储的数据或默认数据
- */
-async function getStorageData(): Promise<StorageData> {
-  return await StorageManager.getData();
-}
-
-/**
  * 恢复标签页
  * @param tabs 要恢复的标签页列表
  * @param openInNewWindow 是否在新窗口中打开
  */
-async function restoreTabs(tabs: TabData[], openInNewWindow: boolean = false): Promise<void> {
+async function restoreTabs(tabs: TabData[], openInNewWindow = false): Promise<void> {
   try {
     await TabManager.restoreTabs(tabs, openInNewWindow);
   } catch (error) {
@@ -338,7 +330,7 @@ async function getStatistics(): Promise<Statistics> {
  */
 async function exportData(format: ExportFormat): Promise<void> {
   try {
-    const data = await getStorageData();
+    const data = await StorageManager.getData();
     let content: string;
     let filename: string;
     let mimeType: string;
