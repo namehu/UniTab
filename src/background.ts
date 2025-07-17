@@ -31,7 +31,7 @@ import { initializeSync, handleSyncMessages } from './background/syncIntegration
 async function triggerSyncIfEnabled(): Promise<void> {
   try {
     // 检查是否配置了远程同步提供商
-    const { config } = syncManager;
+    const config = syncManager.config;
     console.log('Checking sync config:', config);
 
     if (!config.providerConfig || Object.keys(config.providerConfig).length === 0) {
@@ -60,7 +60,6 @@ chrome.runtime.onInstalled.addListener(async (): Promise<void> => {
 
   try {
     await StorageManager.initialize();
-
     // 初始化同步系统
     await initializeSync();
   } catch (error) {

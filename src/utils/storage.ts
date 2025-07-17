@@ -66,7 +66,8 @@ export class StorageManager {
   }
 
   /**
-   * 初始化存储（如果不存在）
+   * 初始化存储
+   * @description 如果storage 中不存在数据则向存储中初始化一份数据数据
    */
   static async initialize(): Promise<void> {
     try {
