@@ -95,9 +95,8 @@ export class SyncManager implements ISyncManager {
    */
   async sync(): Promise<SyncResult> {
     try {
-      console.log('=== Starting sync ===');
+      console.log('===🟢 Starting sync ===');
       this.setStatus('syncing');
-      console.log('🟢 Starting sync process');
 
       if (!this.provider) {
         console.log('No provider, initializing...');
@@ -197,19 +196,6 @@ export class SyncManager implements ISyncManager {
           }
           this.setStatus('error');
           return mergeUploadResult;
-
-        case 'conflict':
-          this.setStatus('error');
-          return {
-            success: false,
-            message: syncDecision.reason,
-            timestamp: new Date().toISOString(),
-            conflict: {
-              local: localSyncData,
-              remote: remoteData!,
-              type: 'device'
-            }
-          };
 
         case 'no_action':
           this.setStatus('success');
@@ -500,23 +486,41 @@ export class SyncManager implements ISyncManager {
 
   /**
    * 基于元数据的智能同步决策
+   * 修复了断开同步后本地操作导致数据被错误覆盖的问题
    */
   private makeSyncDecision(
     localData: any,
     remoteData: SyncData | null
   ): {
-    action: 'upload_local' | 'download_remote' | 'merge' | 'conflict' | 'no_action';
+    action: 'upload_local' | 'download_remote' | 'merge' | 'no_action';
     reason: string;
   } {
     const hasLocalGroups = localData.groups && localData.groups.length > 0;
     const hasRemoteData = remoteData && remoteData.data.groups && remoteData.data.groups.length > 0;
 
+    // 获取时间戳信息
+    const localLastModified = new Date(localData.metadata?.lastModified || 0).getTime();
+    const localLastSync = new Date(localData.metadata?.lastSyncTimestamp || 0).getTime();
+    const remoteTimestamp = new Date(remoteData?.timestamp || 0).getTime();
+
+    // 获取设备和用户信息
+    const localDeviceId = localData.metadata?.deviceId;
+    const remoteDeviceId = remoteData?.device?.id;
+    const remoteGithubUserId = remoteData?.device?.githubUserId;
+
+    // 检查是否曾经同步过（lastSyncTimestamp 不为空且不为0）
+    const hasEverSynced = localLastSync > 0;
+
     console.log('📊 Sync decision analysis:', {
       hasLocalGroups,
       hasRemoteData,
-      localLastModified: localData.metadata?.lastModified,
-      localLastSync: localData.metadata?.lastSyncTimestamp,
-      remoteTimestamp: remoteData?.timestamp
+      localLastModified: new Date(localLastModified).toISOString(),
+      localLastSync: hasEverSynced ? new Date(localLastSync).toISOString() : 'never',
+      remoteTimestamp: remoteData ? new Date(remoteTimestamp).toISOString() : 'none',
+      localDeviceId,
+      remoteDeviceId,
+      remoteGithubUserId,
+      hasEverSynced
     });
 
     // 情况1：本地没有数据，远程有数据
@@ -545,52 +549,87 @@ export class SyncManager implements ISyncManager {
 
     // 情况4：两边都有数据，需要智能决策
     if (hasLocalGroups && hasRemoteData) {
-      const localLastModified = new Date(localData.metadata?.lastModified || 0).getTime();
-      const localLastSync = new Date(localData.metadata?.lastSyncTimestamp || 0).getTime();
-      const remoteTimestamp = new Date(remoteData!.timestamp).getTime();
+      // 4.1 如果从未同步过，说明是首次连接远程同步
+      if (!hasEverSynced) {
+        const localGroupCount = localData.groups?.length || 0;
+        const remoteGroupCount = remoteData.data.groups?.length || 0;
 
-      // 检查是否来自同一设备
-      const isSameDevice = localData.metadata?.deviceId === remoteData!.device?.id;
-
-      // 如果本地数据在上次同步后被修改，且远程数据也比上次同步新
-      if (localLastModified > localLastSync && remoteTimestamp > localLastSync) {
-        if (isSameDevice) {
-          // 同一设备，选择较新的数据
-          return localLastModified > remoteTimestamp
-            ? {
-                action: 'upload_local',
-                reason: '同设备数据冲突，本地数据较新，上传本地数据'
-              }
-            : {
-                action: 'download_remote',
-                reason: '同设备数据冲突，远程数据较新，下载远程数据'
-              };
+        // 首次同步的安全策略：优先保护数据，避免覆盖
+        if (localGroupCount === 0 && remoteGroupCount > 0) {
+          // 本地无数据，远程有数据，直接下载
+          return {
+            action: 'download_remote',
+            reason: '首次同步，本地无数据，从远程下载'
+          };
         }
 
-        // 不同设备，需要用户解决冲突
+        if (localGroupCount > 0 && remoteGroupCount === 0) {
+          // 本地有数据，远程无数据，直接上传
+          return {
+            action: 'upload_local',
+            reason: '首次同步，远程无数据，上传本地数据'
+          };
+        }
+
+        if (localGroupCount > 0 && remoteGroupCount > 0) {
+          // 双方都有数据，为了安全起见，执行合并而不是覆盖
+          // 这样可以避免A设备同步后，B设备连接时覆盖A设备数据的问题
+          return {
+            action: 'merge',
+            reason: '首次同步，本地和远程都有数据，执行安全合并以避免数据丢失'
+          };
+        }
+
+        // 双方都无数据
         return {
-          action: 'conflict',
-          reason: '检测到来自不同设备的数据冲突，需要用户选择解决方案'
+          action: 'no_action',
+          reason: '首次同步，本地和远程均无数据'
         };
       }
 
-      // 如果只有本地数据被修改
-      if (localLastModified > localLastSync) {
+      // 4.2 曾经同步过，进行正常的同步逻辑判断
+
+      // 检查本地数据是否在上次同步后被修改
+      const localModifiedAfterSync = localLastModified > localLastSync;
+      // 检查远程数据是否在上次同步后更新
+      const remoteUpdatedAfterSync = remoteTimestamp > localLastSync;
+
+      if (localModifiedAfterSync && remoteUpdatedAfterSync) {
+        // 双方都有更新，需要合并或选择较新的
+        if (Math.abs(localLastModified - remoteTimestamp) < 60000) {
+          // 1分钟内的差异认为是并发修改
+          return {
+            action: 'merge',
+            reason: '本地和远程都有更新且时间接近，执行智能合并'
+          };
+        }
+        // 选择较新的数据
+        return localLastModified > remoteTimestamp
+          ? {
+              action: 'upload_local',
+              reason: '本地和远程都有更新，本地数据较新，上传本地数据'
+            }
+          : {
+              action: 'download_remote',
+              reason: '本地和远程都有更新，远程数据较新，下载远程数据'
+            };
+      }
+
+      if (localModifiedAfterSync && !remoteUpdatedAfterSync) {
         return {
           action: 'upload_local',
           reason: '本地数据有更新，上传到远程'
         };
       }
 
-      // 如果只有远程数据更新
-      if (remoteTimestamp > localLastSync) {
+      if (!localModifiedAfterSync && remoteUpdatedAfterSync) {
         return {
           action: 'download_remote',
           reason: '远程数据有更新，下载到本地'
         };
       }
 
-      // 两边数据都没有变化
+      // 两边数据都没有在上次同步后变化
       return {
         action: 'no_action',
         reason: '数据已同步，无需操作'
@@ -677,7 +716,6 @@ export class SyncManager implements ISyncManager {
       ...storageData.metadata,
       deviceId,
       deviceName,
-      lastSyncTimestamp: now,
       lastModified: now
     };
 
