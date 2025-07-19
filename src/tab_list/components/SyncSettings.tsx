@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Cloud, Settings, RefreshCw, Upload, Download, AlertTriangle, CheckCircle, XCircle } from 'lucide-react';
+import { Cloud, Settings, RefreshCw, Upload, Download, AlertTriangle, CheckCircle, XCircle, ChevronDown } from 'lucide-react';
 import type { SyncConfig, SyncStatus, SyncProvider } from '../../types/sync';
 import { syncManager } from '../../utils/sync/SyncManager';
 import { SyncProviderFactory } from '../../utils/sync/SyncProviderFactory';
@@ -17,10 +17,8 @@ interface SyncSettingsProps {
 export const SyncSettings: React.FC<SyncSettingsProps> = ({ isOpen, onClose }) => {
   const [config, setConfig] = useState<SyncConfig>(syncManager.config);
   const [status, setStatus] = useState<SyncStatus>(syncManager.getStatus());
-  const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [githubToken, setGithubToken] = useState('');
-  const [showTokenInput, setShowTokenInput] = useState(false);
 
   // 监听同步状态变化
   useEffect(() => {
@@ -66,70 +64,56 @@ export const SyncSettings: React.FC<SyncSettingsProps> = ({ isOpen, onClose }) =
 
   // 处理GitHub认证
   const handleGitHubAuth = async () => {
-    if (showTokenInput && githubToken) {
-      // 使用手动输入的Token
-      try {
-        // 首先验证token是否有效
-        const testResponse = await fetch('https://api.github.com/user', {
-          headers: {
-            Authorization: `Bearer ${githubToken}`,
-            Accept: 'application/vnd.github.v3+json'
-          }
-        });
 
-        if (!testResponse.ok) {
-          throw new Error('Token验证失败，请检查Token是否正确且具有gist权限');
+    try {
+      // 首先验证token是否有效
+      const testResponse = await fetch('https://api.github.com/user', {
+        headers: {
+          Authorization: `Bearer ${githubToken}`,
+          Accept: 'application/vnd.github.v3+json'
         }
+      });
 
-        // Token验证成功，保存配置
-        const newConfig = {
-          ...config,
-          providerConfig: {
-            ...config.providerConfig,
-            token: githubToken,
-            filename: 'unitab-data.json',
-            description: 'UniTab Browser Extension Data'
-          }
-        };
-
-        setConfig(newConfig);
-        await syncManager.setConfig(newConfig);
-
-        // 直接保存到GitHubSyncProvider的配置中
-        await chrome.storage.local.set({
-          sync_github_config: {
-            token: githubToken,
-            filename: 'unitab-data.json',
-            description: 'UniTab Browser Extension Data'
-          }
-        });
-
-        // 检查认证状态
-        await checkAuthStatus();
-        setShowTokenInput(false);
-        setGithubToken('');
-        alert('Token保存成功！');
-      } catch (error) {
-        console.error('GitHub auth with token failed:', error);
-        alert(error instanceof Error ? error.message : '认证失败，请检查Token是否有效');
+      if (!testResponse.ok) {
+        throw new Error('Token验证失败，请检查Token是否正确且具有gist权限');
       }
-    } else {
-      // 打开GitHub Token创建页面
-      setIsAuthenticating(true);
-      try {
-        const provider = SyncProviderFactory.createProvider('github');
-        await provider.initialize(config.providerConfig);
-        await provider.authenticate();
 
-        // 显示token输入框
-        setShowTokenInput(true);
-      } catch (error) {
-        console.error('GitHub auth failed:', error);
-        alert('打开GitHub页面失败，请手动访问：https://github.com/settings/tokens/new');
-      } finally {
-        setIsAuthenticating(false);
-      }
+      // Token验证成功，保存配置
+      const newConfig = {
+        ...config,
+        providerConfig: {
+          ...config.providerConfig,
+          token: githubToken,
+          filename: 'unitab-data.json',
+          description: 'UniTab Browser Extension Data'
+        }
+      };
+
+      setConfig(newConfig);
+      await syncManager.setConfig(newConfig);
+
+      // 直接保存到GitHubSyncProvider的配置中
+      await chrome.storage.local.set({
+        sync_github_config: {
+          token: githubToken,
+          filename: 'unitab-data.json',
+          description: 'UniTab Browser Extension Data'
+        }
+      });
+
+      // 检查认证状态
+      await checkAuthStatus();
+      setGithubToken('');
+      alert('Token保存成功！');
+    } catch (error) {
+      console.error('GitHub auth with token failed:', error);
+      alert(error instanceof Error ? error.message : '认证失败，请检查Token是否有效');
     }
+  };
+
+  // 打开GitHub Token创建页面
+  const openGitHubTokenPage = () => {
+    window.open('https://github.com/settings/tokens/new', '_blank');
   };
 
   // 手动同步
@@ -231,7 +215,6 @@ export const SyncSettings: React.FC<SyncSettingsProps> = ({ isOpen, onClose }) =
 
         // 重置UI状态
         setIsAuthenticated(false);
-        setShowTokenInput(false);
         setGithubToken('');
 
         alert('同步配置已移除');
@@ -312,17 +295,20 @@ export const SyncSettings: React.FC<SyncSettingsProps> = ({ isOpen, onClose }) =
           {/* 同步提供商选择 */}
           <div>
             <label className="mb-2 block text-sm font-medium text-gray-700">同步提供商</label>
-            <select
-              value={config.provider}
-              onChange={(e) => handleProviderChange(e.target.value as SyncProvider)}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              {SyncProviderFactory.getSupportedProviders().map((provider) => (
-                <option key={provider} value={provider}>
-                  {provider === 'github' ? 'GitHub Gist' : provider}
-                </option>
-              ))}
-            </select>
+            <div className="relative">
+              <select
+                value={config.provider}
+                onChange={(e) => handleProviderChange(e.target.value as SyncProvider)}
+                className="w-full appearance-none rounded-md border border-gray-300 px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {SyncProviderFactory.getSupportedProviders().map((provider) => (
+                  <option key={provider} value={provider}>
+                    {provider === 'github' ? 'GitHub Gist' : provider}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 transform text-gray-400 pointer-events-none" />
+            </div>
           </div>
 
           {/* GitHub 认证 */}
@@ -337,52 +323,31 @@ export const SyncSettings: React.FC<SyncSettingsProps> = ({ isOpen, onClose }) =
                       <span>未认证</span>
                     </div>
 
-                    {!showTokenInput ? (
-                      <div className="space-y-2">
+                    <div className="space-y-3">
+                      <input
+                        type="password"
+                        value={githubToken}
+                        onChange={(e) => setGithubToken(e.target.value)}
+                        placeholder="输入 GitHub Personal Access Token"
+                        className="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <button
+                        onClick={handleGitHubAuth}
+                        disabled={!githubToken}
+                        className="w-full rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        确认
+                      </button>
+                      <div className="text-center">
                         <button
-                          onClick={handleGitHubAuth}
-                          disabled={isAuthenticating}
-                          className="w-full rounded-md bg-gray-900 px-4 py-2 text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
+                          onClick={openGitHubTokenPage}
+                          className="text-sm text-blue-600 hover:text-blue-800 hover:underline"
                         >
-                          {isAuthenticating ? '打开GitHub页面中...' : '创建 GitHub Personal Access Token'}
-                        </button>
-                        <button
-                          onClick={() => setShowTokenInput(true)}
-                          className="w-full rounded-md border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
-                        >
-                          手动输入 Personal Access Token
+                          创建 GitHub Personal Access Token
                         </button>
                       </div>
-                    ) : (
-                      <div className="space-y-2">
-                        <input
-                          type="password"
-                          value={githubToken}
-                          onChange={(e) => setGithubToken(e.target.value)}
-                          placeholder="输入 GitHub Personal Access Token"
-                          className="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                        <div className="flex gap-2">
-                          <button
-                            onClick={handleGitHubAuth}
-                            disabled={!githubToken}
-                            className="flex-1 rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-                          >
-                            确认
-                          </button>
-                          <button
-                            onClick={() => {
-                              setShowTokenInput(false);
-                              setGithubToken('');
-                            }}
-                            className="flex-1 rounded-md border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
-                          >
-                            取消
-                          </button>
-                        </div>
-                        <p className="text-xs text-gray-500">需要 &apos;gist&apos; 权限的 Personal Access Token</p>
-                      </div>
-                    )}
+                      <p className="text-xs text-gray-500">需要 &apos;gist&apos; 权限的 Personal Access Token</p>
+                    </div>
                   </>
                 ) : (
                   <div className="space-y-2">
