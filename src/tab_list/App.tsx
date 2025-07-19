@@ -6,7 +6,7 @@ import { syncManager } from '../utils/sync/SyncManager'
 const App: React.FC = () => {
   const [groups, setGroups] = useState<Group[]>([])
   const [loading, setLoading] = useState(true)
-  const [view, setView] = useState<ViewType>('grid')
+  const [view, setView] = useState<ViewType>('list')
   const [sort, setSort] = useState<SortType>('newest')
   const [searchQuery, setSearchQuery] = useState('')
   const [stats, setStats] = useState<Stats>({ groupCount: 0, tabCount: 0 })
