@@ -5,11 +5,23 @@ import { viteStaticCopy } from 'vite-plugin-static-copy';
 import typescript from '@rollup/plugin-typescript';
 
 // https://vitejs.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   css: {
     postcss: './postcss.config.cjs',
   },
+  // 开发模式配置
+  esbuild: {
+    // 保持更多原始代码结构
+    keepNames: true,
+    minifyIdentifiers: false,
+    minifySyntax: false,
+    minifyWhitespace: false,
+  },
   build: {
+    // 开发模式启用 source map
+    sourcemap: mode === 'development' ? 'inline' : false,
+    // 开发模式减少代码压缩
+    minify: mode === 'development' ? false : 'esbuild',
     outDir: 'dist',
     emptyOutDir: true,
     rollupOptions: {
@@ -38,8 +50,9 @@ export default defineConfig({
     react(),
     typescript({
       tsconfig: './tsconfig.json',
-      sourceMap: false,
-      inlineSources: false
+      // 开发模式启用 source map
+      sourceMap: mode === 'development',
+      inlineSources: mode === 'development'
     }),
     viteStaticCopy({
       targets: [
@@ -67,4 +80,4 @@ export default defineConfig({
       ],
     }),
   ],
-});
+}));
