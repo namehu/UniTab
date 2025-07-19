@@ -27,6 +27,7 @@ import { initializeSync, handleSyncMessages } from './background/syncIntegration
 
 /**
  * 检查是否配置了远程同步并触发同步
+ * 修复：不应该仅检查 providerConfig 是否为空，而应该检查提供商是否真正认证成功
  */
 async function triggerSyncIfEnabled(): Promise<void> {
   try {
@@ -34,9 +35,14 @@ async function triggerSyncIfEnabled(): Promise<void> {
     const config = syncManager.config;
     console.log('Checking sync config:', config);
 
-    if (!config.providerConfig || Object.keys(config.providerConfig).length === 0) {
-      console.log('Remote sync not configured, skipping auto sync');
-      return; // 未配置远程同步，跳过
+    // 修复：使用 isAuthenticated 方法检查是否真正配置了远程同步
+    // 而不是仅仅检查 providerConfig 是否为空对象
+    const isAuthenticated = await syncManager.isAuthenticated();
+    console.log('Is remote sync authenticated:', isAuthenticated);
+
+    if (!isAuthenticated) {
+      console.log('Remote sync not configured or not authenticated, skipping auto sync');
+      return; // 未配置远程同步或认证失败，跳过
     }
 
     console.log('Triggering auto sync after data change');
