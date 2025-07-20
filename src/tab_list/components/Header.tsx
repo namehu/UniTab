@@ -1,33 +1,87 @@
-import React from 'react';
-import { Cloud } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Cloud, RotateCw } from 'lucide-react';
+import { syncStatusManager, type SyncStatusInfo } from '../../utils/sync/SyncStatusManager';
 import type { HeaderProps } from '../types';
 
 /**
  * 应用头部组件
  * 包含应用标题、搜索框、新建分组按钮和设置按钮
  */
-export const Header: React.FC<HeaderProps> = ({ 
-  onSearch, 
-  onNewGroup, 
-  onOpenSettings,
-  onOpenSyncSettings 
-}) => {
+export const Header: React.FC<HeaderProps> = ({ onSearch, onNewGroup, onOpenSettings, onOpenSyncSettings }) => {
+  const [syncStatus, setSyncStatus] = useState<SyncStatusInfo>({ status: 'idle' });
+
+  useEffect(() => {
+    // 订阅同步状态变化
+    const unsubscribe = syncStatusManager.subscribe(setSyncStatus);
+
+    // 初始化时检查同步状态
+    syncStatusManager.checkSyncStatus();
+
+    return unsubscribe;
+  }, []);
+
+  // 根据同步状态获取图标
+  const getSyncIcon = () => {
+    return <Cloud className="h-5 w-5 text-gray-600" />;
+  };
+
+  // 根据同步状态获取状态指示器
+  const getSyncStatusIndicator = () => {
+    switch (syncStatus.status) {
+      case 'syncing':
+        return (
+          <div className="absolute -right-0.5 -top-0.5 flex h-2.5 w-2.5 items-center justify-center rounded-full bg-white shadow-sm">
+            <RotateCw className="h-1.5 w-1.5 animate-spin text-blue-500" />
+          </div>
+        );
+      case 'success':
+      case 'connected':
+        return (
+          <div className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border border-white bg-green-500 shadow-sm" />
+        );
+      case 'error':
+        return (
+          <div className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border border-white bg-red-500 shadow-sm" />
+        );
+      case 'connecting':
+      case 'initializing':
+        return (
+          <div className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border border-white bg-yellow-500 shadow-sm" />
+        );
+      case 'idle':
+      default:
+        return null;
+    }
+  };
+
+  // 根据同步状态获取提示信息
+  const getSyncTooltip = () => {
+    switch (syncStatus.status) {
+      case 'initializing':
+        return syncStatus.message || '正在初始化同步...';
+      case 'connected':
+        return syncStatus.message || '远程同步已连接';
+      case 'syncing':
+        return syncStatus.message || '正在同步数据...';
+      case 'success':
+        return syncStatus.message || '同步成功';
+      case 'error':
+        return syncStatus.message || '同步失败';
+      case 'idle':
+      default:
+        return '点击配置同步设置';
+    }
+  };
   return (
-    <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-20">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
+    <header className="sticky top-0 z-20 border-b border-gray-200 bg-white shadow-sm">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="flex h-16 items-center justify-between">
           {/* 左侧：应用标题和图标 */}
           <div className="flex items-center space-x-4">
-            <img 
-              src="../icons/icon48.svg" 
-              alt="Uni Tab" 
-              className="w-8 h-8" 
-            />
-            <h1 className="text-xl font-semibold text-gray-900">
-              标签页管理
-            </h1>
+            <img src="../icons/icon48.svg" alt="Uni Tab" className="h-8 w-8" />
+            <h1 className="text-xl font-semibold text-gray-900">标签页管理</h1>
           </div>
-          
+
           {/* 右侧：搜索框和操作按钮 */}
           <div className="flex items-center space-x-4">
             {/* 搜索框 */}
@@ -37,37 +91,25 @@ export const Header: React.FC<HeaderProps> = ({
               onChange={(e) => onSearch(e.target.value)}
               className="input-field w-64"
             />
-            
+
             {/* 新建分组按钮 */}
-            <button 
-              onClick={onNewGroup} 
-              className="btn btn-primary"
-              title="创建新的标签页分组"
-            >
+            <button onClick={onNewGroup} className="btn btn-primary" title="创建新的标签页分组">
               新建分组
             </button>
-            
-            {/* 同步设置按钮 */}
+
+            {/* 同步设置按钮（合并同步状态指示器） */}
             <button
               onClick={onOpenSyncSettings}
-              className="p-2 rounded-full hover:bg-gray-100"
-              title="同步设置"
+              className="relative rounded-full p-2 transition-colors hover:bg-gray-100"
+              title={getSyncTooltip()}
             >
-              <Cloud className="w-6 h-6 text-gray-600" />
+              {getSyncIcon()}
+              {getSyncStatusIndicator()}
             </button>
-            
+
             {/* 设置按钮 */}
-            <button
-              onClick={onOpenSettings}
-              className="p-2 rounded-full hover:bg-gray-100"
-              title="打开设置页面"
-            >
-              <svg
-                className="w-6 h-6 text-gray-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
+            <button onClick={onOpenSettings} className="rounded-full p-2 hover:bg-gray-100" title="打开设置页面">
+              <svg className="h-6 w-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"

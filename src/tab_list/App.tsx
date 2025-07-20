@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { Header, Toolbar, GroupList, GroupDetailModal, NewGroupModal, SyncSettings } from './components'
+import { syncStatusManager } from '../utils/sync/SyncStatusManager'
 import type { Tab, Group, Stats, SortType, ViewType } from './types'
 
 const App: React.FC = () => {
@@ -35,6 +36,8 @@ const App: React.FC = () => {
 
   useEffect(() => {
     loadData()
+    // 初始化同步状态检查
+    syncStatusManager.checkSyncStatus()
   }, [loadData])
 
   const filteredAndSortedGroups = useMemo(() => {
@@ -68,23 +71,36 @@ const App: React.FC = () => {
   }
 
   const handleGroupUpdate = useCallback(async () => {
-    await loadData()
-    // 更新selectedGroup以反映最新状态
-    if (selectedGroup) {
-      const response = await chrome.runtime.sendMessage({ action: 'getData' })
-      if (response.success) {
-        const updatedGroup = response.data.groups.find((g: Group) => g.id === selectedGroup.id)
-        if (updatedGroup) {
-          setSelectedGroup(updatedGroup)
+    await syncStatusManager.executeWithSync(async () => {
+      await loadData()
+      // 更新selectedGroup以反映最新状态
+      if (selectedGroup) {
+        const response = await chrome.runtime.sendMessage({ action: 'getData' })
+        if (response.success) {
+          const updatedGroup = response.data.groups.find((g: Group) => g.id === selectedGroup.id)
+          if (updatedGroup) {
+            setSelectedGroup(updatedGroup)
+          }
         }
+        return response
       }
-    }
+      return { success: true }
+    }, '更新分组')
   }, [loadData, selectedGroup])
 
   const handleNewGroup = async (name: string, tabs: Tab[]) => {
-    await chrome.runtime.sendMessage({ action: 'createGroup', name, tabs })
-    setNewGroupModalOpen(false)
-    loadData()
+    await syncStatusManager.executeWithSync(async () => {
+      const response = await chrome.runtime.sendMessage({
+        action: 'createGroup',
+        name,
+        tabs
+      })
+      if (response.success) {
+        await loadData()
+        setNewGroupModalOpen(false)
+      }
+      return response
+    }, '创建分组')
   }
 
   const openSettings = () => chrome.runtime.openOptionsPage()

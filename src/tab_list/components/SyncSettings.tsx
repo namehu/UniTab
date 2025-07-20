@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Settings, Github, Check, X, AlertCircle, Loader2 } from 'lucide-react';
 import { UnifiedSyncManager } from '../../utils/sync/UnifiedSyncManager';
 import { UnifiedStorageManager } from '../../utils/storage/UnifiedStorageManager';
+import { syncStatusManager } from '../../utils/sync/SyncStatusManager';
 import type { GitHubUserInfo, SyncResult } from '../../types/storage';
 
 interface SyncSettingsProps {
@@ -75,7 +76,9 @@ export const SyncSettings: React.FC<SyncSettingsProps> = ({ isOpen, onClose }) =
     setMessage(null);
 
     try {
-      const result: SyncResult = await UnifiedSyncManager.sync();
+      const result = await syncStatusManager.executeWithSync(async () => {
+        return await UnifiedSyncManager.sync();
+      }, '手动同步');
 
       if (result.success) {
         setMessage({ type: 'success', text: result.message });
