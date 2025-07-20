@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useAutoSync } from '../hooks/useAutoSync';
 
 // 类型定义
 interface Settings {
@@ -37,6 +38,12 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState('general');
   const [settings, setSettings] = useState<Settings>(initialSettings);
   const [isSaving, setIsSaving] = useState(false);
+
+  // 使用自动同步 hook
+  useAutoSync({
+    checkOnMount: true,
+    syncThresholdMinutes: 30
+  });
 
   useEffect(() => {
     const hash = window.location.hash.substring(1);

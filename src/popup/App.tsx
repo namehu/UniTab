@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Archive } from 'lucide-react';
+import { useAutoSync } from '../hooks/useAutoSync';
 import type { TabGroup } from '../types/storage';
 
 // 类型别名以保持兼容性
@@ -8,6 +9,12 @@ type Group = Omit<TabGroup, 'id' | 'pinned' | 'locked'> & { id: string };
 const App: React.FC = () => {
   const [recentGroups, setRecentGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(false);
+
+  // 使用自动同步 hook
+  useAutoSync({
+    checkOnMount: true,
+    syncThresholdMinutes: 30
+  });
 
   useEffect(() => {
     const loadRecentGroups = async () => {

@@ -17,8 +17,12 @@ import { UnifiedStorageManager } from './utils/storage/UnifiedStorageManager.js'
 import { UnifiedSyncManager } from './utils/sync/UnifiedSyncManager.js';
 import { TabManager } from './utils/tabs.js';
 
+// 防抖同步相关变量
+let syncDebounceTimer: NodeJS.Timeout | null = null;
+const SYNC_DEBOUNCE_DELAY = 5000; // 5秒防抖延迟
+
 /**
- * 检查是否配置了远程同步并触发同步
+ * 检查是否配置了远程同步并触发同步（带防抖处理）
  */
 async function triggerSyncIfEnabled(): Promise<void> {
   try {
@@ -30,13 +34,45 @@ async function triggerSyncIfEnabled(): Promise<void> {
       return;
     }
 
-    console.log('Triggering auto sync after data change');
-    // 异步触发同步，不等待结果
-    UnifiedSyncManager.sync().catch((error) => {
-      console.error('Auto sync failed:', error);
-    });
+    // 清除之前的防抖定时器
+    if (syncDebounceTimer) {
+      clearTimeout(syncDebounceTimer);
+    }
+
+    // 设置新的防抖定时器
+    syncDebounceTimer = setTimeout(async () => {
+      console.log('Triggering debounced sync after data change');
+      try {
+        await UnifiedSyncManager.sync();
+        console.log('Debounced sync completed successfully');
+      } catch (error) {
+        console.error('Debounced sync failed:', error);
+      }
+      syncDebounceTimer = null;
+    }, SYNC_DEBOUNCE_DELAY);
+    
+    console.log('Sync scheduled with debounce delay');
   } catch (error) {
     console.error('Error checking sync config:', error);
+  }
+}
+
+/**
+ * 立即触发同步（不使用防抖，用于启动时等场景）
+ */
+async function triggerSyncImmediately(): Promise<void> {
+  try {
+    const isAuthenticated = await UnifiedSyncManager.isAuthenticated();
+    if (!isAuthenticated) {
+      console.log('Remote sync not configured or not authenticated, skipping immediate sync');
+      return;
+    }
+
+    console.log('Triggering immediate sync');
+    await UnifiedSyncManager.sync();
+    console.log('Immediate sync completed successfully');
+  } catch (error) {
+    console.error('Immediate sync failed:', error);
   }
 }
 
@@ -50,6 +86,97 @@ chrome.runtime.onInstalled.addListener(async (): Promise<void> => {
 
   // 确保数据结构存在
   await UnifiedStorageManager.initializeDefaultData();
+  
+  // 如果已配置同步，执行一次完整同步
+  await triggerSyncImmediately();
+  
+  // 设置定时同步任务
+  await setupPeriodicSync();
+});
+
+/**
+ * 浏览器启动时的初始化
+ */
+chrome.runtime.onStartup.addListener(async (): Promise<void> => {
+  console.log('Browser startup detected');
+  
+  // 检查上次同步时间，如果超过阈值则自动同步
+  await checkAndSyncOnStartup();
+  
+  // 设置定时同步任务
+  await setupPeriodicSync();
+});
+
+/**
+ * Service Worker 启动时的初始化
+ */
+chrome.runtime.onSuspend.addListener(() => {
+  console.log('Service Worker suspending');
+});
+
+/**
+ * 检查启动时是否需要同步
+ */
+async function checkAndSyncOnStartup(): Promise<void> {
+  try {
+    const isAuthenticated = await UnifiedSyncManager.isAuthenticated();
+    if (!isAuthenticated) {
+      console.log('Sync not configured, skipping startup sync');
+      return;
+    }
+
+    const settings = await UnifiedStorageManager.getSettings();
+    const lastSync = settings.sync.lastSync;
+    
+    if (!lastSync) {
+      console.log('No previous sync found, triggering startup sync');
+      await triggerSyncImmediately();
+      return;
+    }
+
+    const lastSyncTime = new Date(lastSync).getTime();
+    const now = Date.now();
+    const startupSyncThreshold = 60 * 60 * 1000; // 1小时
+    
+    if (now - lastSyncTime > startupSyncThreshold) {
+      console.log('Last sync was over threshold, triggering startup sync');
+      await triggerSyncImmediately();
+    } else {
+      console.log('Recent sync found, skipping startup sync');
+    }
+  } catch (error) {
+    console.error('Error checking startup sync:', error);
+  }
+}
+
+/**
+ * 设置定时同步任务
+ */
+async function setupPeriodicSync(): Promise<void> {
+  try {
+    // 清除现有的定时任务
+    await chrome.alarms.clear('periodicSync');
+    
+    // 创建新的定时任务（每2小时）
+    await chrome.alarms.create('periodicSync', {
+      delayInMinutes: 120, // 2小时
+      periodInMinutes: 120 // 每2小时重复
+    });
+    
+    console.log('Periodic sync alarm set up');
+  } catch (error) {
+    console.error('Error setting up periodic sync:', error);
+  }
+}
+
+/**
+ * 监听定时任务触发
+ */
+chrome.alarms.onAlarm.addListener(async (alarm: chrome.alarms.Alarm) => {
+  if (alarm.name === 'periodicSync') {
+    console.log('Periodic sync alarm triggered');
+    await triggerSyncImmediately();
+  }
 });
 
 /**

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { Header, Toolbar, GroupList, GroupDetailModal, NewGroupModal, SyncSettings } from './components'
 import { syncStatusManager } from '../utils/sync/SyncStatusManager'
+import { useAutoSync } from '../hooks/useAutoSync'
 import type { Tab, Group, Stats, SortType, ViewType } from './types'
 
 const App: React.FC = () => {
@@ -15,6 +16,15 @@ const App: React.FC = () => {
   const [isSyncSettingsOpen, setIsSyncSettingsOpen] = useState(false)
 
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null)
+  
+  // 使用自动同步 hook，启用定时同步和网络监听
+  useAutoSync({
+    checkOnMount: true,
+    enablePeriodicSync: true,
+    enableNetworkListener: true,
+    syncThresholdMinutes: 30,
+    periodicSyncIntervalMinutes: 30
+  })
 
   const loadData = useCallback(async () => {
     try {
