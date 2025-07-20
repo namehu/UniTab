@@ -21,6 +21,12 @@ export const SyncSettings: React.FC<SyncSettingsProps> = ({ isOpen, onClose }) =
   const [message, setMessage] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
 
   useEffect(() => {
+    // 组件挂载时预加载数据
+    loadSyncStatus();
+  }, []);
+
+  useEffect(() => {
+    // 弹窗打开时刷新数据
     if (isOpen) {
       loadSyncStatus();
     }
