@@ -10,67 +10,46 @@
  * - 管理数据存储和同步
  */
 
-import type {
-  StorageData,
-  TabGroup,
-  TabData,
-  Statistics,
-  MessageRequest,
-  MessageResponse,
-  ExportFormat
-} from './types/background.js';
+import type { Statistics, MessageRequest, MessageResponse, ExportFormat } from './types/background.js';
+import type { TabInfo } from './types/storage.js';
 
-import { StorageManager, createResponse, generateId, formatDate, updateDataMetadata } from './utils/storage.js';
+import { UnifiedStorageManager } from './utils/storage/UnifiedStorageManager.js';
+import { UnifiedSyncManager } from './utils/sync/UnifiedSyncManager.js';
 import { TabManager } from './utils/tabs.js';
-import { syncManager } from './utils/sync/SyncManager.js';
-import { initializeSync, handleSyncMessages } from './background/syncIntegration.js';
 
 /**
  * 检查是否配置了远程同步并触发同步
- * 修复：不应该仅检查 providerConfig 是否为空，而应该检查提供商是否真正认证成功
  */
 async function triggerSyncIfEnabled(): Promise<void> {
   try {
-    // 检查是否配置了远程同步提供商
-    const config = syncManager.config;
-    console.log('Checking sync config:', config);
-
-    // 修复：使用 isAuthenticated 方法检查是否真正配置了远程同步
-    // 而不是仅仅检查 providerConfig 是否为空对象
-    const isAuthenticated = await syncManager.isAuthenticated();
+    const isAuthenticated = await UnifiedSyncManager.isAuthenticated();
     console.log('Is remote sync authenticated:', isAuthenticated);
 
     if (!isAuthenticated) {
       console.log('Remote sync not configured or not authenticated, skipping auto sync');
-      return; // 未配置远程同步或认证失败，跳过
+      return;
     }
 
     console.log('Triggering auto sync after data change');
     // 异步触发同步，不等待结果
-    syncManager.sync().catch((error) => {
-      console.log('Background sync failed:', error);
+    UnifiedSyncManager.sync().catch((error) => {
+      console.error('Auto sync failed:', error);
     });
   } catch (error) {
-    console.error('Error checking sync status:', error);
+    console.error('Error checking sync config:', error);
   }
 }
 
 // ==================== 初始化和事件监听 ====================
 
 /**
- * 插件安装时的初始化处理
- * 检查是否已有数据，如果没有则初始化默认数据
+ * 插件安装或更新时的初始化
  */
 chrome.runtime.onInstalled.addListener(async (): Promise<void> => {
-  console.log('Uni Tab installed');
+  console.log('UniTab extension installed/updated');
 
-  try {
-    await StorageManager.initialize();
-    // 初始化同步系统
-    await initializeSync();
-  } catch (error) {
-    console.error('Failed to initialize storage or sync:', error);
-  }
+  // 确保数据结构存在
+  await UnifiedStorageManager.initializeDefaultData();
 });
 
 /**
@@ -92,9 +71,9 @@ async function aggregateCurrentWindowTabs(): Promise<void> {
     // 获取当前窗口的所有标签页
     const tabs = await TabManager.getCurrentWindowTabs();
 
-    // 获取存储数据和排除列表
-    const data = await StorageManager.getData();
-    const excludeList = data.settings.excludeList || [];
+    // 获取设置和排除列表
+    const settings = await UnifiedStorageManager.getSettings();
+    const excludeList = settings.excludeList || [];
 
     // 过滤可保存的标签页
     const tabsToSave = TabManager.filterSaveableTabs(tabs, excludeList);
@@ -104,23 +83,15 @@ async function aggregateCurrentWindowTabs(): Promise<void> {
       return;
     }
 
+    // 转换标签页数据
+    const tabInfos: TabInfo[] = TabManager.chromeTabsToTabData(tabsToSave);
+
     // 创建新的标签页分组
-    const newGroup: TabGroup = {
-      id: generateId(),
-      name: `标签页分组 - ${formatDate(new Date())}`,
-      createdAt: new Date().toISOString(),
+    const newGroup = await UnifiedStorageManager.addGroup({
+      name: `标签页分组 - ${formatDate()}`,
       pinned: false,
-      locked: false,
-      tabs: TabManager.chromeTabsToTabData(tabsToSave)
-    };
-
-    // 保存到存储
-    data.groups.unshift(newGroup); // 添加到开头
-
-    // 更新元数据
-    updateDataMetadata(data);
-
-    await StorageManager.setData(data);
+      tabs: tabInfos
+    });
 
     // 关闭已保存的标签页
     const tabIdsToClose = tabsToSave.map((tab) => tab.id).filter(Boolean) as number[];
@@ -143,7 +114,7 @@ async function aggregateCurrentWindowTabs(): Promise<void> {
  * @param tabs 要恢复的标签页列表
  * @param openInNewWindow 是否在新窗口中打开
  */
-async function restoreTabs(tabs: TabData[], openInNewWindow = false): Promise<void> {
+async function restoreTabs(tabs: TabInfo[], openInNewWindow = false): Promise<void> {
   try {
     await TabManager.restoreTabs(tabs, openInNewWindow);
   } catch (error) {
@@ -159,41 +130,22 @@ async function restoreTabs(tabs: TabData[], openInNewWindow = false): Promise<vo
  * @param name 分组名称
  * @param tabs 标签页列表
  */
-async function createGroup(name?: string, tabs: TabData[] = []): Promise<void> {
+async function createGroup(name?: string, tabs: TabInfo[] = []): Promise<void> {
   try {
-    const data = await StorageManager.getData();
-    const newGroup: TabGroup = {
-      id: generateId(),
-      name: name || `标签页分组 - ${formatDate(new Date())}`,
-      createdAt: new Date().toISOString(),
+    const tabInfos: TabInfo[] = tabs.map((tab) => ({
+      title: tab.title,
+      url: tab.url,
+      favIconUrl: tab.favIconUrl || generateFavIconUrl(tab.url)
+    }));
+
+    const newGroup = await UnifiedStorageManager.addGroup({
+      name: name || `标签页分组 - ${formatDate()}`,
       pinned: false,
-      locked: false,
-      tabs: tabs.map(
-        (tab: TabData): TabData => ({
-          id: tab.id,
-          title: tab.title,
-          url: tab.url,
-          favIconUrl: tab.favIconUrl || generateFavIconUrl(tab.url)
-        })
-      )
-    };
-
-    data.groups.unshift(newGroup);
-
-    // 更新元数据
-    updateDataMetadata(data);
-
-    await StorageManager.setData(data);
-
-    // 关闭已保存的标签页（如果有ID）
-    const tabIdsToClose = tabs.map((tab) => tab.id).filter(Boolean) as number[];
-    if (tabIdsToClose.length > 0) {
-      await TabManager.closeTabs(tabIdsToClose);
-    }
+      tabs: tabInfos
+    });
 
     console.log(`Created group: ${newGroup.name}`);
 
-    // 触发实时同步
     // 触发同步（如果启用）
     await triggerSyncIfEnabled();
   } catch (error) {
@@ -209,27 +161,14 @@ async function createGroup(name?: string, tabs: TabData[] = []): Promise<void> {
  */
 async function updateGroupName(groupId: number, newName: string): Promise<void> {
   try {
-    const data = await StorageManager.getData();
-    const group = data.groups.find((g: TabGroup) => g.id === groupId);
+    const result = await UnifiedStorageManager.updateGroup(groupId, { name: newName });
 
-    if (!group) {
-      throw new Error('分组不存在');
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to update group name');
     }
-
-    if (group.locked) {
-      throw new Error('无法修改已锁定的分组');
-    }
-
-    group.name = newName;
-
-    // 更新元数据
-    updateDataMetadata(data);
-
-    await StorageManager.setData(data);
 
     console.log(`Updated group name: ${groupId} -> ${newName}`);
 
-    // 触发实时同步
     // 触发同步（如果启用）
     await triggerSyncIfEnabled();
   } catch (error) {
@@ -244,23 +183,22 @@ async function updateGroupName(groupId: number, newName: string): Promise<void> 
  */
 async function toggleGroupLock(groupId: number): Promise<void> {
   try {
-    const data = await StorageManager.getData();
-    const group = data.groups.find((g: TabGroup) => g.id === groupId);
+    const groups = await UnifiedStorageManager.getGroups();
+    const group = groups.find((g) => g.id === groupId);
 
     if (!group) {
       throw new Error('分组不存在');
     }
 
-    group.locked = !group.locked;
+    const newLockedState = !group.locked;
+    const result = await UnifiedStorageManager.updateGroup(groupId, { locked: newLockedState });
 
-    // 更新元数据
-    updateDataMetadata(data);
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to toggle group lock');
+    }
 
-    await StorageManager.setData(data);
+    console.log(`Toggled group lock: ${groupId} -> ${newLockedState ? 'locked' : 'unlocked'}`);
 
-    console.log(`Toggled group lock: ${groupId} -> ${group.locked ? 'locked' : 'unlocked'}`);
-
-    // 触发实时同步
     // 触发同步（如果启用）
     await triggerSyncIfEnabled();
   } catch (error) {
@@ -275,28 +213,26 @@ async function toggleGroupLock(groupId: number): Promise<void> {
  */
 async function deleteGroup(groupId: number): Promise<void> {
   try {
-    const data = await StorageManager.getData();
-    const groupIndex = data.groups.findIndex((g: TabGroup) => g.id === groupId);
+    // 检查分组是否存在且未锁定
+    const groups = await UnifiedStorageManager.getGroups();
+    const group = groups.find((g) => g.id === groupId);
 
-    if (groupIndex === -1) {
+    if (!group) {
       throw new Error('分组不存在');
     }
 
-    const group = data.groups[groupIndex];
     if (group.locked) {
       throw new Error('无法删除已锁定的分组');
     }
 
-    data.groups.splice(groupIndex, 1);
+    const result = await UnifiedStorageManager.deleteGroup(groupId);
 
-    // 更新元数据
-    updateDataMetadata(data);
-
-    await StorageManager.setData(data);
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to delete group');
+    }
 
     console.log(`Deleted group: ${groupId}`);
 
-    // 触发实时同步
     // 触发同步（如果启用）
     await triggerSyncIfEnabled();
   } catch (error) {
@@ -313,17 +249,7 @@ async function deleteGroup(groupId: number): Promise<void> {
  */
 async function getStatistics(): Promise<Statistics> {
   try {
-    const data = await StorageManager.getData();
-    const groupCount = data.groups.length;
-    const tabCount = data.groups.reduce((total: number, group: TabGroup) => total + group.tabs.length, 0);
-    const lockedGroups = data.groups.filter((g: TabGroup) => g.locked).length;
-
-    return {
-      groupCount,
-      tabCount,
-      lockedGroups,
-      averageTabsPerGroup: groupCount > 0 ? Math.round((tabCount / groupCount) * 10) / 10 : 0
-    };
+    return await UnifiedStorageManager.getStatistics();
   } catch (error) {
     console.error('Error getting statistics:', error);
     throw error;
@@ -336,48 +262,8 @@ async function getStatistics(): Promise<Statistics> {
  */
 async function exportData(format: ExportFormat): Promise<void> {
   try {
-    const data = await StorageManager.getData();
-    let content: string;
-    let filename: string;
-    let mimeType: string;
-
-    const dateStr = new Date().toISOString().split('T')[0];
-
-    if (format === 'json') {
-      content = JSON.stringify(data, null, 2);
-      filename = `tab-sorter-backup-${dateStr}.json`;
-      mimeType = 'application/json';
-    } else if (format === 'csv') {
-      const csvRows = ['分组名称,标签标题,URL,创建时间,是否锁定'];
-      data.groups.forEach((group: TabGroup) => {
-        group.tabs.forEach((tab: TabData) => {
-          const row = [
-            `"${group.name}"`,
-            `"${tab.title}"`,
-            `"${tab.url}"`,
-            `"${group.createdAt}"`,
-            `"${group.locked ? '是' : '否'}"`
-          ].join(',');
-          csvRows.push(row);
-        });
-      });
-      content = csvRows.join('\n');
-      filename = `tab-sorter-backup-${dateStr}.csv`;
-      mimeType = 'text/csv';
-    } else {
-      throw new Error('不支持的导出格式');
-    }
-
-    // 创建下载
-    const blob = new Blob([content], { type: mimeType });
-    const url = URL.createObjectURL(blob);
-
-    await chrome.downloads.download({
-      url: url,
-      filename: filename
-    });
-
-    console.log(`Exported data as ${format}: ${filename}`);
+    const result = await UnifiedStorageManager.exportData();
+    console.log(`Exported data as ${format}:`, result);
   } catch (error) {
     console.error('Error exporting data:', error);
     throw error;
@@ -388,33 +274,16 @@ async function exportData(format: ExportFormat): Promise<void> {
  * 导入数据
  * @param importedData 要导入的数据
  */
-async function importData(importedData: Partial<StorageData>): Promise<void> {
+async function importData(importedData: any): Promise<void> {
   try {
-    // 验证数据格式
-    if (!importedData.groups || !Array.isArray(importedData.groups)) {
-      throw new Error('无效的数据格式');
+    const result = await UnifiedStorageManager.importData(importedData);
+
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to import data');
     }
 
-    const currentData = await StorageManager.getData();
+    console.log(`Imported data successfully`);
 
-    // 合并数据，避免ID冲突
-    const maxId = Math.max(0, ...currentData.groups.map((g: TabGroup) => g.id));
-    importedData.groups.forEach((group: TabGroup, index: number) => {
-      group.id = maxId + index + 1;
-      group.createdAt = group.createdAt || new Date().toISOString();
-      group.locked = group.locked || false;
-    });
-
-    currentData.groups.push(...importedData.groups);
-
-    // 更新元数据
-    updateDataMetadata(currentData);
-
-    await StorageManager.setData(currentData);
-
-    console.log(`Imported ${importedData.groups.length} groups`);
-
-    // 触发实时同步
     // 触发同步（如果启用）
     await triggerSyncIfEnabled();
   } catch (error) {
@@ -429,10 +298,14 @@ async function importData(importedData: Partial<StorageData>): Promise<void> {
  */
 async function clearAllData(): Promise<void> {
   try {
-    await StorageManager.clear();
-    console.log('Cleared all data');
+    const result = await UnifiedStorageManager.clearAllData();
 
-    // 触发实时同步
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to clear data');
+    }
+
+    console.log('All data cleared');
+
     // 触发同步（如果启用）
     await triggerSyncIfEnabled();
   } catch (error) {
@@ -457,6 +330,29 @@ function generateFavIconUrl(url: string): string {
   }
 }
 
+/**
+ * 创建标准化的消息响应
+ * @param success 操作是否成功
+ * @param data 响应数据
+ * @param error 错误信息
+ * @returns 标准化的消息响应
+ */
+function createResponse(success: boolean, data?: any, error?: string): MessageResponse {
+  return {
+    success,
+    data,
+    error
+  };
+}
+
+/**
+ * 格式化日期为 ISO 字符串
+ * @returns ISO 格式的日期字符串
+ */
+function formatDate(): string {
+  return new Date().toISOString();
+}
+
 // ==================== 消息处理 ====================
 
 /**
@@ -479,7 +375,7 @@ chrome.runtime.onMessage.addListener(
             break;
 
           case 'getData':
-            const data = await StorageManager.getData();
+            const data = await UnifiedStorageManager.getData();
             sendResponse(createResponse(true, data));
             break;
 
@@ -487,7 +383,10 @@ chrome.runtime.onMessage.addListener(
             if (!request.data) {
               throw new Error('缺少数据参数');
             }
-            await StorageManager.setData(request.data);
+            const result = await UnifiedStorageManager.setData(request.data);
+            if (!result.success) {
+              throw new Error(result.error || 'Failed to save data');
+            }
             sendResponse(createResponse(true));
             break;
 
@@ -555,12 +454,7 @@ chrome.runtime.onMessage.addListener(
             break;
 
           default:
-            // 尝试处理同步相关消息
-            const syncHandled = handleSyncMessages(request, sender, sendResponse);
-            if (!syncHandled) {
-              throw new Error(`未知的操作类型: ${request.action}`);
-            }
-            return; // 同步消息已处理，直接返回
+            throw new Error(`未知的操作类型: ${request.action}`);
         }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : '未知错误';

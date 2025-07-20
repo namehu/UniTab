@@ -86,12 +86,12 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="bg-gray-50 min-h-screen font-sans">
-      <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
+    <div className="min-h-screen bg-gray-50 font-sans">
+      <header className="sticky top-0 z-10 border-b border-gray-200 bg-white shadow-sm">
+        <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
+          <div className="flex h-16 items-center justify-between">
             <div className="flex items-center space-x-4">
-              <img src="../icons/icon48.svg" alt="Uni Tab" className="w-8 h-8" />
+              <img src="../icons/icon48.svg" alt="Uni Tab" className="h-8 w-8" />
               <h1 className="text-xl font-semibold text-gray-900">Uni Tab 设置</h1>
             </div>
             {isSaving && <div className="text-sm text-gray-500">保存中...</div>}
@@ -99,8 +99,8 @@ const App: React.FC = () => {
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+      <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-1 gap-8 md:grid-cols-4">
           <aside className="md:col-span-1">
             <nav className="space-y-1">
               <TabButton id="general" activeTab={activeTab} onClick={handleTabClick}>
@@ -121,7 +121,7 @@ const App: React.FC = () => {
             </nav>
           </aside>
           <div className="md:col-span-3">
-            <div className="bg-white p-6 rounded-lg shadow-sm">{renderTabContent()}</div>
+            <div className="rounded-lg bg-white p-6 shadow-sm">{renderTabContent()}</div>
           </div>
         </div>
       </main>
@@ -137,7 +137,7 @@ const TabButton: React.FC<{
 }> = ({ id, activeTab, onClick, children }) => (
   <button
     onClick={() => onClick(id)}
-    className={`w-full text-left px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+    className={`w-full rounded-md px-3 py-2 text-left text-sm font-medium transition-colors ${
       activeTab === id ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
     }`}
   >
@@ -203,7 +203,7 @@ const BehaviorSettings: React.FC<{
       <label className="flex items-center">
         <input
           type="checkbox"
-          className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+          className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
           checked={settings.aggregateInNewTab}
           onChange={(e) => onSettingChange('aggregateInNewTab', e.target.checked)}
         />
@@ -214,7 +214,7 @@ const BehaviorSettings: React.FC<{
       <label className="flex items-center">
         <input
           type="checkbox"
-          className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+          className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
           checked={settings.restoreInNewWindow}
           onChange={(e) => onSettingChange('restoreInNewWindow', e.target.checked)}
         />
@@ -225,7 +225,7 @@ const BehaviorSettings: React.FC<{
       <label className="flex items-center">
         <input
           type="checkbox"
-          className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+          className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
           checked={settings.showNotifications}
           onChange={(e) => onSettingChange('showNotifications', e.target.checked)}
         />
@@ -241,42 +241,42 @@ const AdvancedSettings: React.FC<{
 }> = ({ settings, onSettingChange }) => (
   <div>
     <SettingsCard title="分组管理" description="高级分组管理选项。">
-      <label className="flex items-center mb-4">
+      <label className="mb-4 flex items-center">
         <input
           type="checkbox"
-          className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+          className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
           checked={settings.autoLockGroups}
           onChange={(e) => onSettingChange('autoLockGroups', e.target.checked)}
         />
         <span className="ml-2 text-sm text-gray-700">自动锁定重要分组</span>
       </label>
-      <label className="flex items-center mb-4">
+      <label className="mb-4 flex items-center">
         <input
           type="checkbox"
-          className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+          className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
           checked={settings.excludePinnedTabs}
           onChange={(e) => onSettingChange('excludePinnedTabs', e.target.checked)}
         />
         <span className="ml-2 text-sm text-gray-700">聚合时排除固定标签页</span>
       </label>
       <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700 mb-2">最大保留分组数量</label>
+        <label className="mb-2 block text-sm font-medium text-gray-700">最大保留分组数量</label>
         <input
           type="number"
           min="10"
           max="200"
           className="input-field w-32"
           value={settings.maxGroupsToKeep}
-          onChange={(e) => onSettingChange('maxGroupsToKeep', parseInt(e.target.value))}
+          onChange={(e) => onSettingChange('maxGroupsToKeep', parseInt(e.target.value, 10))}
         />
-        <p className="text-xs text-gray-500 mt-1">超过此数量时，最旧的分组将被自动删除</p>
+        <p className="mt-1 text-xs text-gray-500">超过此数量时，最旧的分组将被自动删除</p>
       </div>
     </SettingsCard>
     <SettingsCard title="安全设置" description="数据保护和确认选项。">
-      <label className="flex items-center mb-4">
+      <label className="mb-4 flex items-center">
         <input
           type="checkbox"
-          className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+          className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
           checked={settings.confirmBeforeDelete}
           onChange={(e) => onSettingChange('confirmBeforeDelete', e.target.checked)}
         />
@@ -284,10 +284,10 @@ const AdvancedSettings: React.FC<{
       </label>
     </SettingsCard>
     <SettingsCard title="自动备份" description="定期备份您的数据。">
-      <label className="flex items-center mb-4">
+      <label className="mb-4 flex items-center">
         <input
           type="checkbox"
-          className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+          className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
           checked={settings.autoBackup}
           onChange={(e) => onSettingChange('autoBackup', e.target.checked)}
         />
@@ -295,11 +295,11 @@ const AdvancedSettings: React.FC<{
       </label>
       {settings.autoBackup && (
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">备份间隔（天）</label>
+          <label className="mb-2 block text-sm font-medium text-gray-700">备份间隔（天）</label>
           <select
             className="input-field w-48"
             value={settings.backupInterval}
-            onChange={(e) => onSettingChange('backupInterval', parseInt(e.target.value))}
+            onChange={(e) => onSettingChange('backupInterval', parseInt(e.target.value, 10))}
           >
             <option value={1}>每天</option>
             <option value={3}>每3天</option>
@@ -376,16 +376,16 @@ const DataManagement: React.FC = () => {
   return (
     <div>
       <SettingsCard title="统计信息">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-blue-50 p-4 rounded-lg">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+          <div className="rounded-lg bg-blue-50 p-4">
             <div className="text-2xl font-bold text-blue-600">{stats.groupCount}</div>
             <div className="text-sm text-gray-600">分组数量</div>
           </div>
-          <div className="bg-green-50 p-4 rounded-lg">
+          <div className="rounded-lg bg-green-50 p-4">
             <div className="text-2xl font-bold text-green-600">{stats.tabCount}</div>
             <div className="text-sm text-gray-600">标签页总数</div>
           </div>
-          <div className="bg-yellow-50 p-4 rounded-lg">
+          <div className="rounded-lg bg-yellow-50 p-4">
             <div className="text-2xl font-bold text-yellow-600">{stats.lockedGroups}</div>
             <div className="text-sm text-gray-600">已锁定分组</div>
           </div>
@@ -431,7 +431,7 @@ const About: React.FC = () => {
     <div>
       <SettingsCard title="关于 Uni Tab">
         <p className="text-sm text-gray-700">版本: {version}</p>
-        <p className="text-sm text-gray-700 mt-2">一款帮助您管理和组织浏览器标签页的扩展程序。</p>
+        <p className="mt-2 text-sm text-gray-700">一款帮助您管理和组织浏览器标签页的扩展程序。</p>
         <div className="mt-4">
           <a
             href="https://github.com/your-repo/tab-sorter-pro"

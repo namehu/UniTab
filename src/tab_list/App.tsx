@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { Header, Toolbar, GroupList, GroupDetailModal, NewGroupModal, SyncSettings } from './components'
 import type { Tab, Group, Stats, SortType, ViewType } from './types'
-import { syncManager } from '../utils/sync/SyncManager'
 
 const App: React.FC = () => {
   const [groups, setGroups] = useState<Group[]>([])
@@ -12,7 +11,8 @@ const App: React.FC = () => {
   const [stats, setStats] = useState<Stats>({ groupCount: 0, tabCount: 0 })
   const [isGroupDetailModalOpen, setGroupDetailModalOpen] = useState(false)
   const [isNewGroupModalOpen, setNewGroupModalOpen] = useState(false)
-  const [isSyncSettingsOpen, setSyncSettingsOpen] = useState(false)
+  const [isSyncSettingsOpen, setIsSyncSettingsOpen] = useState(false)
+
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null)
 
   const loadData = useCallback(async () => {
@@ -35,21 +35,6 @@ const App: React.FC = () => {
 
   useEffect(() => {
     loadData()
-    
-    // 监听同步状态变化，同步成功后刷新数据
-    const handleSyncStatusChange = (status: string) => {
-      if (status === 'success') {
-        console.log('Sync completed, refreshing data...')
-        loadData()
-      }
-    }
-    
-    syncManager.onStatusChange(handleSyncStatusChange)
-    
-    // 清理监听器
-    return () => {
-      syncManager.offStatusChange(handleSyncStatusChange)
-    }
   }, [loadData])
 
   const filteredAndSortedGroups = useMemo(() => {
@@ -104,13 +89,21 @@ const App: React.FC = () => {
 
   const openSettings = () => chrome.runtime.openOptionsPage()
 
+  const handleOpenSyncSettings = () => {
+    setIsSyncSettingsOpen(true)
+  }
+
+  const handleCloseSyncSettings = () => {
+    setIsSyncSettingsOpen(false)
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Header 
         onSearch={setSearchQuery} 
         onNewGroup={() => setNewGroupModalOpen(true)} 
         onOpenSettings={openSettings}
-        onOpenSyncSettings={() => setSyncSettingsOpen(true)}
+        onOpenSyncSettings={handleOpenSyncSettings}
       />
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Toolbar stats={stats} sort={sort} onSortChange={setSort} view={view} onViewChange={setView} />
@@ -127,7 +120,11 @@ const App: React.FC = () => {
         <GroupDetailModal group={selectedGroup} onClose={() => setGroupDetailModalOpen(false)} onUpdate={handleGroupUpdate} />
       )}
       {isNewGroupModalOpen && <NewGroupModal onClose={() => setNewGroupModalOpen(false)} onSave={handleNewGroup} />}
-      {isSyncSettingsOpen && <SyncSettings isOpen={isSyncSettingsOpen} onClose={() => setSyncSettingsOpen(false)} />}
+      <SyncSettings
+        isOpen={isSyncSettingsOpen}
+        onClose={handleCloseSyncSettings}
+      />
+
     </div>
   )
 }

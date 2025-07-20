@@ -1,62 +1,7 @@
 /**
  * Background Service Worker 相关类型定义
+ * 注意：TabData、TabGroup、StorageData 等数据结构已迁移到 storage.d.ts
  */
-
-// 标签页数据结构
-export interface TabData {
-  /** 标签页ID（可选，用于关闭标签页） */
-  id?: number;
-  /** 标签页标题 */
-  title: string;
-  /** 标签页URL */
-  url: string;
-  /** 网站图标URL */
-  favIconUrl?: string;
-}
-
-// 标签页分组数据结构
-export interface TabGroup {
-  /** 分组唯一ID（时间戳） */
-  id: number;
-  /** 分组名称 */
-  name: string;
-  /** 创建时间（ISO字符串） */
-  createdAt: string;
-  /** 是否固定 */
-  pinned?: boolean;
-  /** 是否锁定（防止删除和修改） */
-  locked?: boolean;
-  /** 分组包含的标签页列表 */
-  tabs: TabData[];
-}
-
-// 应用设置
-export interface AppSettings {
-  /** 排除列表（不保存的URL前缀） */
-  excludeList: string[];
-}
-
-// 元数据结构
-export interface DataMetadata {
-  /** 本地数据最后修改时间 */
-  lastModified: string;
-  /** 最后成功同步时间戳 */
-  lastSyncTimestamp: string;
-  /** 设备唯一标识 */
-  deviceId: string;
-}
-
-// 主数据结构
-export interface StorageData {
-  /** 数据版本号 */
-  version: string;
-  /** 元数据 */
-  metadata: DataMetadata;
-  /** 应用设置 */
-  settings: AppSettings;
-  /** 标签页分组列表 */
-  groups: TabGroup[];
-}
 
 // 统计信息
 export interface Statistics {

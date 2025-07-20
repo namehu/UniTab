@@ -13,19 +13,8 @@ export type SyncProvider = 'github';
 export type SyncStatus = 'idle' | 'syncing' | 'success' | 'error';
 
 /**
- * 同步配置接口
- */
-export interface SyncConfig {
-  /** 同步提供商 */
-  provider: SyncProvider;
-  /** 最后同步时间 */
-  lastSync?: string;
-  /** 提供商特定配置 */
-  providerConfig: Record<string, any>;
-}
-
-/**
- * GitHub 同步配置
+ * GitHub 同步配置（已废弃，迁移到 storage.d.ts 的统一结构中）
+ * @deprecated 使用 UnifiedStorageData.settings.sync.github 替代
  */
 export interface GitHubSyncConfig {
   /** GitHub Token */
@@ -59,12 +48,13 @@ export interface SyncResult {
 }
 
 /**
- * 同步数据接口
+ * 远程同步数据结构（已废弃，迁移到 storage.d.ts 的统一结构中）
+ * @deprecated 使用 UnifiedStorageData 替代
  */
 export interface SyncData {
   /** 数据版本 */
   version: string;
-  /** 同步时间戳 */
+  /** 时间戳 */
   timestamp: string;
   /** 设备信息 */
   device: {

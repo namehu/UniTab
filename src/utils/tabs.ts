@@ -3,8 +3,8 @@
  * 提供标签页操作的通用功能
  */
 
-import type { TabData, TabGroup, ChromeTab } from '../types/background.js'
-import { generateFavIconUrl, shouldExcludeUrl } from './storage.js'
+import type { TabInfo, TabGroup } from '../types/storage.js'
+import type { ChromeTab } from '../types/background.js'
 
 /**
  * 标签页管理器
@@ -73,25 +73,39 @@ export class TabManager {
   }
 
   /**
-   * 将Chrome标签页转换为TabData格式
+   * 将Chrome标签页转换为TabInfo格式
    * @param tab Chrome标签页对象
-   * @returns TabData对象
+   * @returns TabInfo对象
    */
-  static chromeTabToTabData(tab: ChromeTab): TabData {
+  static chromeTabToTabData(tab: ChromeTab): TabInfo {
     return {
-      id: tab.id,
       title: tab.title || '未命名标签页',
-      url: tab.url,
-      favIconUrl: tab.favIconUrl || generateFavIconUrl(tab.url)
+      url: tab.url || '',
+      favIconUrl: tab.favIconUrl || this.generateFavIconUrl(tab.url || ''),
+      pinned: tab.pinned || false
     }
   }
 
   /**
-   * 批量转换Chrome标签页为TabData格式
-   * @param tabs Chrome标签页列表
-   * @returns TabData列表
+   * 生成网站图标URL
+   * @param url 网站URL
+   * @returns 图标URL
    */
-  static chromeTabsToTabData(tabs: ChromeTab[]): TabData[] {
+  static generateFavIconUrl(url: string): string {
+    try {
+      const urlObj = new URL(url)
+      return `${urlObj.protocol}//${urlObj.hostname}/favicon.ico`
+    } catch {
+      return 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><rect width="16" height="16" fill="%23ddd"/></svg>'
+    }
+  }
+
+  /**
+   * 批量转换Chrome标签页为TabInfo格式
+   * @param tabs Chrome标签页列表
+   * @returns TabInfo列表
+   */
+  static chromeTabsToTabData(tabs: ChromeTab[]): TabInfo[] {
     return tabs.map((tab) => this.chromeTabToTabData(tab))
   }
 
@@ -101,7 +115,7 @@ export class TabManager {
    * @param openInNewWindow 是否在新窗口中打开
    * @returns 创建的标签页ID列表
    */
-  static async restoreTabs(tabs: TabData[], openInNewWindow = false): Promise<number[]> {
+  static async restoreTabs(tabs: TabInfo[], openInNewWindow = false): Promise<number[]> {
     try {
       const createdTabIds: number[] = []
 
@@ -134,9 +148,9 @@ export class TabManager {
         }
       } else {
         // 在当前窗口中打开标签页
-        for (const tabData of tabs) {
+        for (const tabInfo of tabs) {
           const tab = await chrome.tabs.create({
-            url: tabData.url,
+            url: tabInfo.url,
             active: false
           })
           if (tab.id) {
@@ -274,6 +288,36 @@ export class TabManager {
 }
 
 /**
+ * 检查URL是否应该被排除
+ * @param url 要检查的URL
+ * @param excludeList 排除列表
+ * @returns 是否应该排除
+ */
+function shouldExcludeUrl(url: string, excludeList: string[]): boolean {
+  if (!url || !excludeList.length) {
+    return false
+  }
+
+  try {
+    const urlObj = new URL(url)
+    const hostname = urlObj.hostname
+    
+    return excludeList.some(excludePattern => {
+      // 支持通配符匹配
+      if (excludePattern.includes('*')) {
+        const regex = new RegExp(excludePattern.replace(/\*/g, '.*'))
+        return regex.test(hostname)
+      }
+      
+      // 精确匹配或子域名匹配
+      return hostname === excludePattern || hostname.endsWith('.' + excludePattern)
+    })
+  } catch {
+    return false
+  }
+}
+
+/**
  * 分组管理相关工具函数
  */
 export class GroupManager {
@@ -305,7 +349,7 @@ export class GroupManager {
    * @param tabs 标签页列表
    * @returns 去重后的标签页列表
    */
-  static deduplicateTabs(tabs: TabData[]): TabData[] {
+  static deduplicateTabs(tabs: TabInfo[]): TabInfo[] {
     const seen = new Set<string>()
     return tabs.filter((tab) => {
       if (seen.has(tab.url)) {
@@ -321,8 +365,8 @@ export class GroupManager {
    * @param tabs 标签页列表
    * @returns 按域名分组的标签页
    */
-  static groupTabsByDomain(tabs: TabData[]): Record<string, TabData[]> {
-    const groups: Record<string, TabData[]> = {}
+  static groupTabsByDomain(tabs: TabInfo[]): Record<string, TabInfo[]> {
+    const groups: Record<string, TabInfo[]> = {}
 
     tabs.forEach((tab) => {
       try {
