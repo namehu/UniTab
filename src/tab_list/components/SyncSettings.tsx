@@ -208,9 +208,10 @@ export const SyncSettings: React.FC<SyncSettingsProps> = ({ isOpen, onClose }) =
                   type="text"
                   value={gistId}
                   onChange={(e) => setGistId(e.target.value)}
-                  placeholder="留空将自动创建新的 Gist"
+                  placeholder="留空将自动查找或创建 unitab-data.json"
                   className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
+                <p className="mt-1 text-xs text-gray-500">留空时将自动查找现有的 unitab-data.json 文件，如果没有则创建新的 Gist</p>
               </div>
 
               <button

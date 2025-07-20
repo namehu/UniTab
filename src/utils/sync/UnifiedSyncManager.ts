@@ -70,15 +70,21 @@ export class UnifiedSyncManager {
         };
       }
       
-      // 如果没有提供 gistId，创建新的 Gist
+      // 如果没有提供 gistId，先尝试查找现有的默认 Gist
       let finalGistId = gistId;
       if (!finalGistId) {
-        finalGistId = await this.createGist(token) || undefined;
+        // 先尝试查找现有的默认 Gist
+         finalGistId = await this.findDefaultGist(token) || undefined;
+        
+        // 如果没有找到，则创建新的 Gist
         if (!finalGistId) {
-          return {
-            success: false,
-            message: '创建 Gist 失败'
-          };
+          finalGistId = await this.createGist(token) || undefined;
+          if (!finalGistId) {
+            return {
+              success: false,
+              message: '创建 Gist 失败'
+            };
+          }
         }
       }
       
@@ -362,6 +368,41 @@ export class UnifiedSyncManager {
   /**
    * 创建新的 Gist
    */
+  /**
+   * 查找现有的默认 Gist
+   */
+  private static async findDefaultGist(token: string): Promise<string | null> {
+    try {
+      const response = await fetch(`${this.GITHUB_API_BASE}/gists`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `token ${token}`,
+          'Content-Type': 'application/json',
+        }
+      });
+      
+      if (!response.ok) {
+        return null;
+      }
+      
+      const gists = await response.json();
+      
+      // 查找包含默认文件名的 Gist
+      for (const gist of gists) {
+        if (gist.files && gist.files[this.DEFAULT_FILENAME]) {
+          console.log(`找到现有的默认 Gist: ${gist.id}`);
+          return gist.id;
+        }
+      }
+      
+      console.log('未找到现有的默认 Gist');
+      return null;
+    } catch (error) {
+      console.error('查找默认 Gist 失败:', error);
+      return null;
+    }
+  }
+
   private static async createGist(token: string): Promise<string | null> {
     try {
       const initialData = await UnifiedStorageManager.getData();
@@ -389,6 +430,7 @@ export class UnifiedSyncManager {
       }
       
       const gist = await response.json();
+      console.log(`创建新的 Gist: ${gist.id}`);
       return gist.id;
     } catch (error) {
       console.error('创建 Gist 失败:', error);
