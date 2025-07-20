@@ -10,6 +10,10 @@ export class UnifiedSyncManager {
   private static readonly GITHUB_API_BASE = 'https://api.github.com';
   private static readonly DEFAULT_FILENAME = 'unitab-data.json';
   private static readonly DEFAULT_DESCRIPTION = 'UniTab Browser Extension Data';
+  
+  // Token 验证缓存
+  private static tokenValidationCache = new Map<string, { isValid: boolean; timestamp: number }>();
+  private static readonly CACHE_DURATION = 5 * 60 * 1000; // 5分钟缓存
 
   /**
    * 检查是否已配置同步
@@ -292,6 +296,9 @@ export class UnifiedSyncManager {
         };
       }
       
+      // 清除所有 token 缓存
+      this.tokenValidationCache.clear();
+      
       return {
         success: true,
         message: '同步配置已清除',
@@ -304,6 +311,25 @@ export class UnifiedSyncManager {
         message: error instanceof Error ? error.message : '清除配置失败'
       };
     }
+  }
+
+  /**
+   * 清理过期的缓存条目
+   */
+  private static cleanExpiredCache(): void {
+    const now = Date.now();
+    for (const [token, cache] of this.tokenValidationCache.entries()) {
+      if (now - cache.timestamp >= this.CACHE_DURATION) {
+        this.tokenValidationCache.delete(token);
+      }
+    }
+  }
+
+  /**
+   * 清除指定 token 的缓存
+   */
+  private static clearTokenCache(token: string): void {
+    this.tokenValidationCache.delete(token);
   }
 
   /**
@@ -324,13 +350,34 @@ export class UnifiedSyncManager {
    */
   private static async validateGitHubToken(token: string): Promise<boolean> {
     try {
+      // 检查缓存
+      const cached = this.tokenValidationCache.get(token);
+      const now = Date.now();
+      
+      if (cached && (now - cached.timestamp) < this.CACHE_DURATION) {
+        console.log('使用缓存的 token 验证结果');
+        return cached.isValid;
+      }
+      
+      console.log('执行 GitHub API token 验证');
       const response = await fetch(`${this.GITHUB_API_BASE}/user`, {
         headers: {
           'Authorization': `token ${token}`,
         }
       });
       
-      return response.ok;
+      const isValid = response.ok;
+      
+      // 缓存结果
+      this.tokenValidationCache.set(token, {
+        isValid,
+        timestamp: now
+      });
+      
+      // 清理过期缓存
+      this.cleanExpiredCache();
+      
+      return isValid;
     } catch (error) {
       console.error('验证 token 失败:', error);
       return false;

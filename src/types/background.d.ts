@@ -28,7 +28,8 @@ export type MessageAction =
   | 'getStatistics'
   | 'exportData'
   | 'importData'
-  | 'clearAllData';
+  | 'clearAllData'
+  | 'triggerSync';
 
 // 消息请求结构
 export interface MessageRequest {

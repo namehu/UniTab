@@ -580,6 +580,11 @@ chrome.runtime.onMessage.addListener(
             sendResponse(createResponse(true));
             break;
 
+          case 'triggerSync':
+            await triggerSyncImmediately();
+            sendResponse(createResponse(true));
+            break;
+
           default:
             throw new Error(`未知的操作类型: ${request.action}`);
         }

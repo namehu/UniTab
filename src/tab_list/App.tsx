@@ -46,8 +46,6 @@ const App: React.FC = () => {
 
   useEffect(() => {
     loadData()
-    // 初始化同步状态检查
-    syncStatusManager.checkSyncStatus()
   }, [loadData])
 
   const filteredAndSortedGroups = useMemo(() => {
